@@ -20,6 +20,24 @@ async function request(path, options = {}) {
   return data
 }
 
+// Requête multipart (upload de fichier) : pas de Content-Type manuel, le
+// navigateur doit fixer lui-même le boundary du form-data.
+async function requestMultipart(path, formData) {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: { ...authHeaders() },
+    body: formData
+  })
+
+  const data = await res.json().catch(() => ({}))
+
+  if (!res.ok) {
+    throw new Error(data.error || `Erreur ${res.status}`)
+  }
+
+  return data
+}
+
 export const api = {
   login: (role, password) =>
     request('/auth/login', {
@@ -33,6 +51,11 @@ export const api = {
   },
   updateEleve: (id, payload) =>
     request(`/eleves/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  importEleves: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return requestMultipart('/eleves/import', formData)
+  },
 
   getEtablissement: () => request('/etablissement'),
   saveEtablissement: (payload) =>

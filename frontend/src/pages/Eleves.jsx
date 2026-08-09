@@ -6,6 +6,18 @@ import IconButton from '../components/IconButton.jsx'
 import Modal from '../components/Modal.jsx'
 import { api } from '../lib/api.js'
 
+function Badge({ ok, labelOui, labelNon }) {
+  return (
+    <span
+      className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+        ok ? 'bg-teal-light text-teal' : 'bg-[#f1f5f2] text-[#6b7d74]'
+      }`}
+    >
+      {ok ? labelOui : labelNon}
+    </span>
+  )
+}
+
 export default function Eleves() {
   const [tab, setTab] = useState('liste')
   const [search, setSearch] = useState('')
@@ -18,7 +30,14 @@ export default function Eleves() {
   const [selected, setSelected] = useState(null) // élève ouvert dans la popup "voir"
   const [toDelete, setToDelete] = useState(null) // élève ciblé par la popup "supprimer"
   const [editing, setEditing] = useState(null) // élève ouvert dans la popup "modifier"
-  const [editForm, setEditForm] = useState({ nom: '', classe: '', statut: 'Actif' })
+  const [editForm, setEditForm] = useState({
+    nom: '',
+    classe: '',
+    statut: 'Actif',
+    niveau: '',
+    affecte: false,
+    redoublant: false
+  })
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
@@ -48,7 +67,14 @@ export default function Eleves() {
 
   function openEdit(el) {
     setEditing(el)
-    setEditForm({ nom: el.nom || '', classe: el.classe || '', statut: el.statut || 'Actif' })
+    setEditForm({
+      nom: el.nom || '',
+      classe: el.classe || '',
+      statut: el.statut || 'Actif',
+      niveau: el.niveau || '',
+      affecte: !!el.affecte,
+      redoublant: !!el.redoublant
+    })
     setEditError('')
   }
 
@@ -132,27 +158,54 @@ export default function Eleves() {
         )}
 
         {tab === 'trombi' ? (
-          <div className="text-center text-sm text-[#6b7d74] py-16">
-            Pas de photos disponibles pour l'instant — le trombinoscope s'activera dès
-            qu'une colonne photo sera ajoutée à la table élèves.
-          </div>
+          loading ? (
+            <div className="text-center text-sm text-[#6b7d74] py-16">Chargement…</div>
+          ) : eleves.length === 0 ? (
+            <div className="text-center text-sm text-[#6b7d74] py-16">Aucun élève trouvé.</div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+              {eleves.map((el) => (
+                <div
+                  key={el.id}
+                  className="text-center cursor-pointer group"
+                  onClick={() => setSelected(el)}
+                >
+                  <div className="w-full aspect-square rounded-xl overflow-hidden bg-[#eef6f1] border border-[#e3ebe6] mb-1.5">
+                    {el.photo_url ? (
+                      <img src={el.photo_url} alt={el.nom} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-2xl text-[#a9bcb2]">
+                        🧑‍🎓
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-xs font-semibold text-vert-fonce truncate">{el.nom}</div>
+                  <div className="text-[11px] text-[#6b7d74] truncate">{el.classe}</div>
+                </div>
+              ))}
+            </div>
+          )
         ) : loading ? (
           <div className="text-center text-sm text-[#6b7d74] py-16">Chargement…</div>
         ) : (
           <table className="w-full text-sm table-fixed">
             <colgroup>
-              <col className="w-[16%]" />
-              <col className="w-[38%]" />
-              <col className="w-[14%]" />
-              <col className="w-[14%]" />
-              <col className="w-[18%]" />
+              <col className="w-[12%]" />
+              <col className="w-[24%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[20%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
                 <th className="py-1.5 pr-3">Matricule</th>
                 <th className="py-1.5 pr-3">Nom</th>
                 <th className="py-1.5 pr-3">Classe</th>
+                <th className="py-1.5 pr-3">Niveau</th>
                 <th className="py-1.5 pr-3">Statut</th>
+                <th className="py-1.5 pr-3">Qualité</th>
                 <th className="py-1.5 pr-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -162,7 +215,13 @@ export default function Eleves() {
                   <td className="py-1.5 pr-3 font-medium text-vert-fonce truncate">{el.matricule}</td>
                   <td className="py-1.5 pr-3 truncate">{el.nom}</td>
                   <td className="py-1.5 pr-3 truncate">{el.classe}</td>
-                  <td className="py-1.5 pr-3 truncate">{el.statut}</td>
+                  <td className="py-1.5 pr-3 truncate">{el.niveau || '—'}</td>
+                  <td className="py-1.5 pr-3">
+                    <Badge ok={!!el.affecte} labelOui="Affecté" labelNon="Non affecté" />
+                  </td>
+                  <td className="py-1.5 pr-3">
+                    <Badge ok={!!el.redoublant} labelOui="Redoublant" labelNon="Non redoublant" />
+                  </td>
                   <td className="py-1.5 pr-3">
                     <div className="flex justify-end gap-2">
                       <IconButton variant="teal" title="Voir" onClick={() => setSelected(el)}>
@@ -184,7 +243,7 @@ export default function Eleves() {
               ))}
               {eleves.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-center py-10 text-[#6b7d74]">
+                  <td colSpan={7} className="text-center py-10 text-[#6b7d74]">
                     Aucun élève trouvé.
                   </td>
                 </tr>
@@ -198,10 +257,20 @@ export default function Eleves() {
       <Modal open={!!selected} onClose={() => setSelected(null)} title="Fiche élève">
         {selected && (
           <div className="space-y-2 text-sm">
+            {selected.photo_url && (
+              <img
+                src={selected.photo_url}
+                alt={selected.nom}
+                className="w-24 h-24 rounded-xl object-cover mb-3 border border-[#e3ebe6]"
+              />
+            )}
             <Row label="Matricule" value={selected.matricule} />
             <Row label="Nom" value={selected.nom} />
             <Row label="Classe" value={selected.classe} />
+            <Row label="Niveau" value={selected.niveau} />
             <Row label="Statut" value={selected.statut} />
+            <Row label="Affectation" value={selected.affecte ? 'Affecté' : 'Non affecté'} />
+            <Row label="Qualité" value={selected.redoublant ? 'Redoublant' : 'Non redoublant'} />
           </div>
         )}
       </Modal>
@@ -245,13 +314,24 @@ export default function Eleves() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-[#3d4f45] mb-1.5">Classe</label>
-              <input
-                value={editForm.classe}
-                onChange={(e) => setEditForm((f) => ({ ...f, classe: e.target.value }))}
-                className="w-full px-3.5 py-2.5 border border-[#d7e8de] rounded-lg text-sm focus:outline-none focus:border-teal"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-semibold text-[#3d4f45] mb-1.5">Classe</label>
+                <input
+                  value={editForm.classe}
+                  onChange={(e) => setEditForm((f) => ({ ...f, classe: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 border border-[#d7e8de] rounded-lg text-sm focus:outline-none focus:border-teal"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-[#3d4f45] mb-1.5">Niveau</label>
+                <input
+                  value={editForm.niveau}
+                  onChange={(e) => setEditForm((f) => ({ ...f, niveau: e.target.value }))}
+                  placeholder="ex: 6eme"
+                  className="w-full px-3.5 py-2.5 border border-[#d7e8de] rounded-lg text-sm focus:outline-none focus:border-teal"
+                />
+              </div>
             </div>
 
             <div>
@@ -266,6 +346,37 @@ export default function Eleves() {
                 <option>Transféré</option>
                 <option>Exclu</option>
               </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-semibold text-[#3d4f45] mb-1.5">
+                  Affectation
+                </label>
+                <select
+                  value={editForm.affecte ? 'oui' : 'non'}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, affecte: e.target.value === 'oui' }))
+                  }
+                  className="w-full px-3.5 py-2.5 border border-[#d7e8de] rounded-lg text-sm focus:outline-none focus:border-teal"
+                >
+                  <option value="oui">Affecté</option>
+                  <option value="non">Non affecté</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-[#3d4f45] mb-1.5">Qualité</label>
+                <select
+                  value={editForm.redoublant ? 'oui' : 'non'}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, redoublant: e.target.value === 'oui' }))
+                  }
+                  className="w-full px-3.5 py-2.5 border border-[#d7e8de] rounded-lg text-sm focus:outline-none focus:border-teal"
+                >
+                  <option value="non">Non redoublant</option>
+                  <option value="oui">Redoublant</option>
+                </select>
+              </div>
             </div>
 
             {editError && (

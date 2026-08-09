@@ -1,16 +1,21 @@
 import { Router } from 'express'
+import multer from 'multer'
+import AdmZip from 'adm-zip'
+import * as XLSX from 'xlsx'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 
 const router = Router()
 
+// Upload en mémoire (le zip ne touche jamais le disque), limité à 50 Mo.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } })
+
+const PHOTOS_BUCKET = 'photos-eleves'
+
 // GET /api/eleves?search=...&classe=...&statut=...
 router.get('/', requireAuth, async (req, res) => {
   const { search = '', classe = '', statut = '' } = req.query
 
-  // NOTE: select('*') volontairement large ici — la colonne aperçue dans Supabase
-  // commençait par "redu..." (reduction ? redoublant ?) sans confirmation du nom exact.
-  // À restreindre à des colonnes précises une fois le schéma confirmé.
   let query = supabase
     .from('eleves')
     .select('*', { count: 'exact' })
@@ -37,18 +42,23 @@ router.get('/', requireAuth, async (req, res) => {
   res.json({ eleves: data, total: count })
 })
 
-// PUT /api/eleves/:id  { nom, classe, statut }
+// PUT /api/eleves/:id  { nom, classe, statut, niveau, affecte, redoublant }
 router.put('/:id', requireAuth, async (req, res) => {
   const { id } = req.params
-  const { nom, classe, statut } = req.body || {}
+  const { nom, classe, statut, niveau, affecte, redoublant } = req.body || {}
 
   if (!nom || !classe) {
     return res.status(400).json({ error: 'Nom et classe sont requis' })
   }
 
+  const payload = { nom, classe, statut }
+  if (niveau !== undefined) payload.niveau = niveau
+  if (affecte !== undefined) payload.affecte = !!affecte
+  if (redoublant !== undefined) payload.redoublant = !!redoublant
+
   const { data, error } = await supabase
     .from('eleves')
-    .update({ nom, classe, statut })
+    .update(payload)
     .eq('id', id)
     .select()
     .single()
@@ -59,6 +69,144 @@ router.put('/:id', requireAuth, async (req, res) => {
   }
 
   res.json({ eleve: data })
+})
+
+// ---------- Import ZIP (CSV + photos) ----------
+
+function normaliseCle(str) {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // enlève les accents
+    .trim()
+    .toLowerCase()
+}
+
+function versBooleen(val) {
+  const v = normaliseCle(val)
+  return ['oui', 'yes', 'true', '1', 'affecte', 'redoublant'].includes(v)
+}
+
+// POST /api/eleves/import  (multipart/form-data, champ "file" = un .zip)
+// Le zip doit contenir : un fichier .xlsx (colonnes matricule, nom, classe,
+// niveau, affecte, redoublant, photo) + les fichiers photos référencés par
+// la colonne "photo" (nom de fichier exact, ex: 21421986V.jpg).
+router.post('/import', requireAuth, upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Aucun fichier reçu (champ "file" attendu)' })
+  }
+
+  let zip
+  try {
+    zip = new AdmZip(req.file.buffer)
+  } catch {
+    return res.status(400).json({ error: 'Le fichier envoyé n\'est pas un zip valide' })
+  }
+
+  const entries = zip.getEntries()
+  const excelEntry = entries.find((e) => !e.isDirectory && /\.xlsx?$/i.test(e.entryName))
+
+  if (!excelEntry) {
+    return res.status(400).json({ error: 'Aucun fichier .xlsx trouvé dans le zip' })
+  }
+
+  let rows
+  try {
+    const workbook = XLSX.read(excelEntry.getData(), { type: 'buffer' })
+    const feuille = workbook.Sheets[workbook.SheetNames[0]]
+    const rawRows = XLSX.utils.sheet_to_json(feuille, { defval: '' })
+    // Normalise les clés (en-têtes) : minuscules, sans accents.
+    rows = rawRows.map((row) => {
+      const clean = {}
+      for (const [k, v] of Object.entries(row)) {
+        clean[normaliseCle(k)] = typeof v === 'string' ? v.trim() : v
+      }
+      return clean
+    })
+  } catch (err) {
+    return res.status(400).json({ error: `Fichier Excel illisible : ${err.message}` })
+  }
+
+  // Index des photos présentes dans le zip, par nom de fichier (sans dossier).
+  const photosParNom = new Map()
+  for (const e of entries) {
+    if (!e.isDirectory && /\.(jpe?g|png|webp)$/i.test(e.entryName)) {
+      const nomFichier = e.entryName.split('/').pop()
+      photosParNom.set(nomFichier, e)
+    }
+  }
+
+  let importes = 0
+  let mis_a_jour = 0
+  const erreurs = []
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    const ligne = i + 2 // +2 : ligne 1 = en-têtes, index 0-based
+
+    const matricule = String(row.matricule ?? '').trim()
+    const nom = String(row.nom ?? '').trim()
+    const classe = String(row.classe ?? '').trim()
+
+    if (!matricule || !nom || !classe) {
+      erreurs.push(`Ligne ${ligne} : matricule, nom et classe sont obligatoires`)
+      continue
+    }
+
+    const niveau = String(row.niveau || '').trim() || classe.replace(/\d+$/, '').trim()
+    const affecte = versBooleen(row.affecte)
+    const redoublant = versBooleen(row.redoublant)
+
+    let photo_url
+    const nomPhoto = (row.photo || '').trim()
+    if (nomPhoto) {
+      const entryPhoto = photosParNom.get(nomPhoto)
+      if (!entryPhoto) {
+        erreurs.push(`Ligne ${ligne} (${matricule}) : photo "${nomPhoto}" introuvable dans le zip`)
+      } else {
+        try {
+          const buffer = entryPhoto.getData()
+          const ext = nomPhoto.split('.').pop().toLowerCase()
+          const chemin = `${matricule}.${ext}`
+          const { error: uploadError } = await supabase.storage
+            .from(PHOTOS_BUCKET)
+            .upload(chemin, buffer, { upsert: true, contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` })
+
+          if (uploadError) {
+            erreurs.push(`Ligne ${ligne} (${matricule}) : échec upload photo — ${uploadError.message}`)
+          } else {
+            photo_url = supabase.storage.from(PHOTOS_BUCKET).getPublicUrl(chemin).data.publicUrl
+          }
+        } catch (err) {
+          erreurs.push(`Ligne ${ligne} (${matricule}) : erreur photo — ${err.message}`)
+        }
+      }
+    }
+
+    const payload = { matricule, nom, classe, niveau, affecte, redoublant, statut: row.statut || 'Actif' }
+    if (photo_url) payload.photo_url = photo_url
+
+    try {
+      const { data: existant } = await supabase
+        .from('eleves')
+        .select('id')
+        .eq('matricule', matricule)
+        .maybeSingle()
+
+      if (existant) {
+        const { error } = await supabase.from('eleves').update(payload).eq('id', existant.id)
+        if (error) throw error
+        mis_a_jour++
+      } else {
+        const { error } = await supabase.from('eleves').insert(payload)
+        if (error) throw error
+        importes++
+      }
+    } catch (err) {
+      erreurs.push(`Ligne ${ligne} (${matricule}) : ${err.message}`)
+    }
+  }
+
+  res.json({ importes, mis_a_jour, total_lignes: rows.length, erreurs })
 })
 
 export default router

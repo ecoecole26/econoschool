@@ -12,6 +12,7 @@ const NAV_SECTIONS = [
       { to: '/creation-compte', label: 'Création de compte', icon: '👤' },
       { to: '/tarifs', label: 'Tarifs par niveau', icon: '💰' },
       { to: '/types-frais', label: 'Types de frais', icon: '🏷️' },
+      { to: '/import-eleves', label: 'Importer élèves', icon: '📥' },
       { to: '/banque', label: 'Banque', icon: '🏛️' }
     ]
   },

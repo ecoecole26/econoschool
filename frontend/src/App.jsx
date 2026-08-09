@@ -5,6 +5,7 @@ import ParametresEtablissement from './pages/ParametresEtablissement.jsx'
 import CreationCompte from './pages/CreationCompte.jsx'
 import TarifsParNiveau from './pages/TarifsParNiveau.jsx'
 import TypesDeFrais from './pages/TypesDeFrais.jsx'
+import ImportEleves from './pages/ImportEleves.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
 
 function RequireAuth({ children }) {
@@ -21,11 +22,12 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Login />} />
 
-      {/* Paramétrages — 5 pages */}
+      {/* Paramétrages */}
       <Route path="/parametres" element={protect(<ParametresEtablissement />)} />
       <Route path="/creation-compte" element={<CreationCompte />} />
       <Route path="/tarifs" element={protect(<TarifsParNiveau />)} />
       <Route path="/types-frais" element={protect(<TypesDeFrais />)} />
+      <Route path="/import-eleves" element={protect(<ImportEleves />)} />
       <Route path="/banque" element={protect(<ComingSoon title="Banque" icon="🏛️" />)} />
 
       {/* Reste du menu */}
