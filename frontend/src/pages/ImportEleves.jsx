@@ -4,33 +4,103 @@ import PageHeader from '../components/PageHeader.jsx'
 import { Card } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
 
-export default function ImportEleves() {
-  const fileInputRef = useRef(null)
-  const [file, setFile] = useState(null)
-  const [importing, setImporting] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState('')
+// Petit badge coloré pour les résultats d'import (créés / mis à jour / erreurs...).
+function Badge({ children, className }) {
+  return (
+    <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${className}`}>
+      {children}
+    </span>
+  )
+}
 
-  function handleFileChange(e) {
-    setFile(e.target.files?.[0] || null)
-    setResult(null)
-    setError('')
+// Bloc d'erreurs déroulant, réutilisé pour les deux imports.
+function ListeErreurs({ erreurs }) {
+  if (!erreurs?.length) return null
+  return (
+    <div className="bg-red-50 border border-red-100 rounded-lg p-3 max-h-56 overflow-y-auto">
+      <ul className="text-xs text-red-700 space-y-1">
+        {erreurs.map((e, i) => (
+          <li key={i}>• {e}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+export default function ImportEleves() {
+  // --- Import des élèves (fichier Excel du ministère) ---
+  const fileInputEleves = useRef(null)
+  const [fichierEleves, setFichierEleves] = useState(null)
+  const [importingEleves, setImportingEleves] = useState(false)
+  const [resultEleves, setResultEleves] = useState(null)
+  const [erreurEleves, setErreurEleves] = useState('')
+
+  // --- Import des photos (fichier .zip) ---
+  const fileInputPhotos = useRef(null)
+  const [fichierPhotos, setFichierPhotos] = useState(null)
+  const [importingPhotos, setImportingPhotos] = useState(false)
+  const [resultPhotos, setResultPhotos] = useState(null)
+  const [erreurPhotos, setErreurPhotos] = useState('')
+
+  // --- Téléchargement du modèle Excel ---
+  const [telechargement, setTelechargement] = useState(false)
+  const [erreurModele, setErreurModele] = useState('')
+
+  function handleFileChangeEleves(e) {
+    setFichierEleves(e.target.files?.[0] || null)
+    setResultEleves(null)
+    setErreurEleves('')
   }
 
-  async function handleImport() {
-    if (!file) return
-    setImporting(true)
-    setError('')
-    setResult(null)
+  async function handleImportEleves() {
+    if (!fichierEleves) return
+    setImportingEleves(true)
+    setErreurEleves('')
+    setResultEleves(null)
     try {
-      const res = await api.importEleves(file)
-      setResult(res)
-      setFile(null)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+      const res = await api.importEleves(fichierEleves)
+      setResultEleves(res)
+      setFichierEleves(null)
+      if (fileInputEleves.current) fileInputEleves.current.value = ''
     } catch (err) {
-      setError(err.message || "Erreur lors de l'import")
+      setErreurEleves(err.message || "Erreur lors de l'import")
     } finally {
-      setImporting(false)
+      setImportingEleves(false)
+    }
+  }
+
+  function handleFileChangePhotos(e) {
+    setFichierPhotos(e.target.files?.[0] || null)
+    setResultPhotos(null)
+    setErreurPhotos('')
+  }
+
+  async function handleImportPhotos() {
+    if (!fichierPhotos) return
+    setImportingPhotos(true)
+    setErreurPhotos('')
+    setResultPhotos(null)
+    try {
+      const res = await api.importPhotosEleves(fichierPhotos)
+      setResultPhotos(res)
+      setFichierPhotos(null)
+      if (fileInputPhotos.current) fileInputPhotos.current.value = ''
+    } catch (err) {
+      setErreurPhotos(err.message || "Erreur lors de l'import des photos")
+    } finally {
+      setImportingPhotos(false)
+    }
+  }
+
+  async function handleTelechargerModele() {
+    setTelechargement(true)
+    setErreurModele('')
+    try {
+      await api.telechargerModeleEleves()
+    } catch (err) {
+      setErreurModele(err.message || 'Erreur lors du téléchargement du modèle')
+    } finally {
+      setTelechargement(false)
     }
   }
 
@@ -39,14 +109,13 @@ export default function ImportEleves() {
       <PageHeader
         icon="📥"
         title="Importer élèves"
-        subtitle="Ajoute ou met à jour des élèves en masse à partir d'un fichier CSV + photos, regroupés dans un .zip."
+        subtitle="Ajoute ou met à jour des élèves à partir du fichier Excel du ministère, puis ajoute leurs photos séparément à partir d'un .zip."
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <Card title="Format attendu du zip" icon="📄">
+        <Card title="Format attendu du fichier Excel" icon="📄">
           <p className="text-sm text-[#3d4f45] mb-3">
-            Le fichier .zip doit contenir, à la racine, votre fichier Excel du ministère{' '}
-            <b>tel quel, sans aucune modification</b>, plus les photos (optionnel).
+            Envoyez votre fichier Excel du ministère <b>tel quel, sans aucune modification</b>.
           </p>
           <div className="bg-[#f6f8f7] border border-[#e3ebe6] rounded-lg p-3 text-xs font-mono overflow-x-auto mb-4">
             Matricule | Nom | Prénom | Classe | Qualité | Statut | ...
@@ -56,66 +125,130 @@ export default function ImportEleves() {
             <li>Colonne <b>Qualité</b> : "Redoublant" / "NRedoublant" (reconnu automatiquement)</li>
             <li>Le <b>niveau</b> (6eme, 5eme…) est déduit automatiquement de la classe</li>
             <li>Toutes les autres colonnes du fichier (moyennes, téléphones, etc.) sont ignorées sans problème</li>
-            <li>Pour ajouter une <b>photo</b> : ajoutez une colonne "photo" avec le nom exact du fichier image (ex : 21421986V.jpg), présent à côté de l'Excel dans le zip. Laissez vide sinon.</li>
             <li>Un élève déjà existant (même matricule) est mis à jour, sinon il est créé</li>
           </ul>
+
+          <button
+            onClick={handleTelechargerModele}
+            disabled={telechargement}
+            className="mt-4 w-full px-4 py-2 rounded-lg border border-vert text-vert text-sm font-semibold hover:bg-teal-light transition disabled:opacity-50"
+          >
+            📄 {telechargement ? 'Téléchargement…' : 'Télécharger le modèle Excel'}
+          </button>
+          {erreurModele && (
+            <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {erreurModele}
+            </div>
+          )}
         </Card>
 
-        <Card title="Envoyer le fichier" icon="⬆️">
+        <Card title="1. Importer les élèves (Excel)" icon="⬆️">
           <div className="border-2 border-dashed border-[#d7e8de] rounded-xl p-6 text-center mb-4">
             <input
-              ref={fileInputRef}
+              ref={fileInputEleves}
               type="file"
-              accept=".zip"
-              onChange={handleFileChange}
+              accept=".xlsx,.xls"
+              onChange={handleFileChangeEleves}
               className="text-sm"
             />
-            {file && (
+            {fichierEleves && (
               <p className="text-sm text-[#3d4f45] mt-3">
-                Fichier sélectionné : <b>{file.name}</b> ({Math.round(file.size / 1024)} Ko)
+                Fichier sélectionné : <b>{fichierEleves.name}</b> ({Math.round(fichierEleves.size / 1024)} Ko)
               </p>
             )}
           </div>
 
           <button
-            onClick={handleImport}
-            disabled={!file || importing}
+            onClick={handleImportEleves}
+            disabled={!fichierEleves || importingEleves}
             className="w-full px-5 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold disabled:opacity-50"
           >
-            {importing ? 'Import en cours…' : 'Importer'}
+            {importingEleves ? 'Import en cours…' : 'Importer les élèves'}
           </button>
 
-          {error && (
+          {erreurEleves && (
             <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-              {error}
+              {erreurEleves}
             </div>
           )}
 
-          {result && (
+          {resultEleves && (
             <div className="mt-4 space-y-3">
               <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-vert-fonce text-white">
-                  {result.importes} créé{result.importes > 1 ? 's' : ''}
-                </span>
-                <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-teal-light text-teal">
-                  {result.mis_a_jour} mis à jour
-                </span>
-                {result.erreurs?.length > 0 && (
-                  <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-rose-light text-rose">
-                    {result.erreurs.length} erreur{result.erreurs.length > 1 ? 's' : ''}
-                  </span>
+                <Badge className="bg-vert-fonce text-white">
+                  {resultEleves.importes} créé{resultEleves.importes > 1 ? 's' : ''}
+                </Badge>
+                <Badge className="bg-teal-light text-teal">
+                  {resultEleves.mis_a_jour} mis à jour
+                </Badge>
+                {resultEleves.erreurs?.length > 0 && (
+                  <Badge className="bg-rose-light text-rose">
+                    {resultEleves.erreurs.length} erreur{resultEleves.erreurs.length > 1 ? 's' : ''}
+                  </Badge>
                 )}
               </div>
+              <ListeErreurs erreurs={resultEleves.erreurs} />
+            </div>
+          )}
+        </Card>
+      </div>
 
-              {result.erreurs?.length > 0 && (
-                <div className="bg-red-50 border border-red-100 rounded-lg p-3 max-h-56 overflow-y-auto">
-                  <ul className="text-xs text-red-700 space-y-1">
-                    {result.erreurs.map((e, i) => (
-                      <li key={i}>• {e}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+        <Card title="2. Importer les photos (.zip)" icon="🖼️">
+          <p className="text-sm text-[#3d4f45] mb-3">
+            Regroupez toutes les photos dans un seul fichier <b>.zip</b>. Chaque photo doit être
+            nommée avec le <b>matricule exact</b> de l'élève (ex : <span className="font-mono">21421986V.jpg</span>).
+            La photo est associée automatiquement à l'élève déjà importé.
+          </p>
+
+          <div className="border-2 border-dashed border-[#d7e8de] rounded-xl p-6 text-center mb-4">
+            <input
+              ref={fileInputPhotos}
+              type="file"
+              accept=".zip"
+              onChange={handleFileChangePhotos}
+              className="text-sm"
+            />
+            {fichierPhotos && (
+              <p className="text-sm text-[#3d4f45] mt-3">
+                Fichier sélectionné : <b>{fichierPhotos.name}</b> ({Math.round(fichierPhotos.size / 1024)} Ko)
+              </p>
+            )}
+          </div>
+
+          <button
+            onClick={handleImportPhotos}
+            disabled={!fichierPhotos || importingPhotos}
+            className="w-full px-5 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold disabled:opacity-50"
+          >
+            {importingPhotos ? 'Import en cours…' : 'Importer les photos'}
+          </button>
+
+          {erreurPhotos && (
+            <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {erreurPhotos}
+            </div>
+          )}
+
+          {resultPhotos && (
+            <div className="mt-4 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <Badge className="bg-vert-fonce text-white">
+                  {resultPhotos.importees} photo{resultPhotos.importees > 1 ? 's' : ''} importée{resultPhotos.importees > 1 ? 's' : ''}
+                </Badge>
+                {resultPhotos.non_trouves?.length > 0 && (
+                  <Badge className="bg-teal-light text-teal">
+                    {resultPhotos.non_trouves.length} sans élève correspondant
+                  </Badge>
+                )}
+                {resultPhotos.erreurs?.length > 0 && (
+                  <Badge className="bg-rose-light text-rose">
+                    {resultPhotos.erreurs.length} erreur{resultPhotos.erreurs.length > 1 ? 's' : ''}
+                  </Badge>
+                )}
+              </div>
+              <ListeErreurs erreurs={resultPhotos.non_trouves} />
+              <ListeErreurs erreurs={resultPhotos.erreurs} />
             </div>
           )}
         </Card>

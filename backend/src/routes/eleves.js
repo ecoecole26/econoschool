@@ -7,10 +7,27 @@ import { requireAuth } from '../middleware/requireAuth.js'
 
 const router = Router()
 
-// Upload en mémoire (le zip ne touche jamais le disque), limité à 50 Mo.
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } })
+// Upload en mémoire (le fichier ne touche jamais le disque).
+// Fichier Excel seul : 50 Mo suffisent largement.
+const uploadExcel = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } })
+// Zip de photos : peut être volumineux (plusieurs centaines de photos), on monte à 300 Mo.
+const uploadZip = multer({ storage: multer.memoryStorage(), limits: { fileSize: 300 * 1024 * 1024 } })
 
 const PHOTOS_BUCKET = 'photos-eleves'
+
+// Colonnes attendues dans le fichier Excel du ministère (ordre du modèle téléchargeable).
+const COLONNES_MODELE = [
+  'Matricule', 'Nom', 'Prénom', 'Sexe', 'Date de naissance', 'Lieu de naissance',
+  'Classe', 'Nom du parent', 'Téléphone 1', 'Téléphone 2',
+  'Moyenne_t1', 'Moyenne_t2', 'Moyenne_t3', 'moyenne_generale',
+  'decision_fin_annee', 'Qualité', 'rang_classe', 'Statut'
+]
+const EXEMPLE_MODELE = [
+  '21421986V', 'ABDON', 'GRACE EMMANUELA SARAH', 'F', '21/06/2009', 'SAOUNDI',
+  '6eme6', 'ADBON KARIM', '0759109875', '0759109875',
+  7.69, 8.15, 8.54, 8.21,
+  'Admis', 'NRedoublant', '', 'Affecte'
+]
 
 // GET /api/eleves?search=...&classe=...&statut=...
 router.get('/', requireAuth, async (req, res) => {
@@ -99,33 +116,34 @@ function estRedoublant(val) {
   return v === 'redoublant' || v === 'oui' || v === 'yes' || v === 'true' || v === '1'
 }
 
-// POST /api/eleves/import  (multipart/form-data, champ "file" = un .zip)
-// Le zip doit contenir : un fichier .xlsx avec au minimum les colonnes
-// Matricule, Nom, Classe (+ Prénom, Qualité, Statut si présentes — format
-// export ministériel reconnu directement) + les photos référencées par la
-// colonne "photo" (nom de fichier exact, ex: 21421986V.jpg), optionnelle.
-router.post('/import', requireAuth, upload.single('file'), async (req, res) => {
+// GET /api/eleves/modele  → télécharge un fichier .xlsx vierge (avec un exemple)
+// reprenant exactement les colonnes attendues (format export ministériel).
+router.get('/modele', requireAuth, (req, res) => {
+  const feuille = XLSX.utils.aoa_to_sheet([COLONNES_MODELE, EXEMPLE_MODELE])
+  feuille['!cols'] = COLONNES_MODELE.map((c) => ({ wch: Math.max(12, c.length + 2) }))
+
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, feuille, 'Elèves')
+
+  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  res.setHeader('Content-Disposition', 'attachment; filename="modele_import_eleves.xlsx"')
+  res.send(buffer)
+})
+
+// POST /api/eleves/import  (multipart/form-data, champ "file" = un .xlsx)
+// Le fichier Excel du ministère, tel quel, avec au minimum les colonnes
+// Matricule, Nom, Classe (+ Prénom, Qualité, Statut si présentes).
+// N'importe pas les photos : voir POST /api/eleves/import-photos.
+router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Aucun fichier reçu (champ "file" attendu)' })
   }
 
-  let zip
-  try {
-    zip = new AdmZip(req.file.buffer)
-  } catch {
-    return res.status(400).json({ error: 'Le fichier envoyé n\'est pas un zip valide' })
-  }
-
-  const entries = zip.getEntries()
-  const excelEntry = entries.find((e) => !e.isDirectory && /\.xlsx?$/i.test(e.entryName))
-
-  if (!excelEntry) {
-    return res.status(400).json({ error: 'Aucun fichier .xlsx trouvé dans le zip' })
-  }
-
   let rows
   try {
-    const workbook = XLSX.read(excelEntry.getData(), { type: 'buffer' })
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' })
     const feuille = workbook.Sheets[workbook.SheetNames[0]]
     const rawRows = XLSX.utils.sheet_to_json(feuille, { defval: '' })
     // Normalise les clés (en-têtes) : minuscules, sans accents.
@@ -138,15 +156,6 @@ router.post('/import', requireAuth, upload.single('file'), async (req, res) => {
     })
   } catch (err) {
     return res.status(400).json({ error: `Fichier Excel illisible : ${err.message}` })
-  }
-
-  // Index des photos présentes dans le zip, par nom de fichier (sans dossier).
-  const photosParNom = new Map()
-  for (const e of entries) {
-    if (!e.isDirectory && /\.(jpe?g|png|webp)$/i.test(e.entryName)) {
-      const nomFichier = e.entryName.split('/').pop()
-      photosParNom.set(nomFichier, e)
-    }
   }
 
   let importes = 0
@@ -174,34 +183,7 @@ router.post('/import', requireAuth, upload.single('file'), async (req, res) => {
     // "qualite" = colonne ministérielle "Qualité" (Redoublant/NRedoublant) ; "redoublant" = fichier simplifié.
     const redoublant = estRedoublant(row.qualite || row.redoublant)
 
-    let photo_url
-    const nomPhoto = (row.photo || '').trim()
-    if (nomPhoto) {
-      const entryPhoto = photosParNom.get(nomPhoto)
-      if (!entryPhoto) {
-        erreurs.push(`Ligne ${ligne} (${matricule}) : photo "${nomPhoto}" introuvable dans le zip`)
-      } else {
-        try {
-          const buffer = entryPhoto.getData()
-          const ext = nomPhoto.split('.').pop().toLowerCase()
-          const chemin = `${matricule}.${ext}`
-          const { error: uploadError } = await supabase.storage
-            .from(PHOTOS_BUCKET)
-            .upload(chemin, buffer, { upsert: true, contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` })
-
-          if (uploadError) {
-            erreurs.push(`Ligne ${ligne} (${matricule}) : échec upload photo — ${uploadError.message}`)
-          } else {
-            photo_url = supabase.storage.from(PHOTOS_BUCKET).getPublicUrl(chemin).data.publicUrl
-          }
-        } catch (err) {
-          erreurs.push(`Ligne ${ligne} (${matricule}) : erreur photo — ${err.message}`)
-        }
-      }
-    }
-
     const payloadCommun = { matricule, nom, classe, niveau, affecte, redoublant }
-    if (photo_url) payloadCommun.photo_url = photo_url
 
     try {
       const { data: existant } = await supabase
@@ -229,6 +211,85 @@ router.post('/import', requireAuth, upload.single('file'), async (req, res) => {
   }
 
   res.json({ importes, mis_a_jour, total_lignes: rows.length, erreurs })
+})
+
+// POST /api/eleves/import-photos  (multipart/form-data, champ "file" = un .zip)
+// Le zip doit contenir des photos dont le nom de fichier (sans l'extension)
+// correspond exactement au matricule de l'élève (ex : 21421986V.jpg).
+// Chaque photo est associée automatiquement à l'élève déjà existant.
+router.post('/import-photos', requireAuth, uploadZip.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Aucun fichier reçu (champ "file" attendu)' })
+  }
+
+  let zip
+  try {
+    zip = new AdmZip(req.file.buffer)
+  } catch {
+    return res.status(400).json({ error: "Le fichier envoyé n'est pas un zip valide" })
+  }
+
+  const entries = zip.getEntries().filter(
+    (e) => !e.isDirectory && /\.(jpe?g|png|webp)$/i.test(e.entryName)
+  )
+
+  if (entries.length === 0) {
+    return res.status(400).json({ error: 'Aucune photo (jpg/jpeg/png/webp) trouvée dans le zip' })
+  }
+
+  let importees = 0
+  const non_trouves = []
+  const erreurs = []
+
+  for (const entry of entries) {
+    const nomFichier = entry.entryName.split('/').pop()
+    // Le nom du fichier photo doit correspondre au matricule (comparaison
+    // insensible à la casse, car les photos scannées ont parfois une casse différente).
+    const matricule = nomFichier.replace(/\.[^.]+$/, '').trim()
+
+    try {
+      const { data: existant, error: erreurRecherche } = await supabase
+        .from('eleves')
+        .select('id, matricule')
+        .ilike('matricule', matricule)
+        .maybeSingle()
+
+      if (erreurRecherche) throw erreurRecherche
+
+      if (!existant) {
+        non_trouves.push(`${nomFichier} : aucun élève avec le matricule "${matricule}"`)
+        continue
+      }
+
+      const buffer = entry.getData()
+      const ext = nomFichier.split('.').pop().toLowerCase()
+      const chemin = `${existant.matricule}.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from(PHOTOS_BUCKET)
+        .upload(chemin, buffer, { upsert: true, contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` })
+
+      if (uploadError) {
+        erreurs.push(`${nomFichier} : échec upload — ${uploadError.message}`)
+        continue
+      }
+
+      const photo_url = supabase.storage.from(PHOTOS_BUCKET).getPublicUrl(chemin).data.publicUrl
+
+      const { error: majError } = await supabase
+        .from('eleves')
+        .update({ photo_url })
+        .eq('id', existant.id)
+
+      if (majError) throw majError
+
+      importees++
+    } catch (err) {
+      erreurs.push(`${nomFichier} : ${err.message}`)
+    }
+  }
+
+  res.json({ importees, total_photos: entries.length, non_trouves, erreurs })
 })
 
 export default router

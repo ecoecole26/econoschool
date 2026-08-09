@@ -56,6 +56,27 @@ export const api = {
     formData.append('file', file)
     return requestMultipart('/eleves/import', formData)
   },
+  importPhotosEleves: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return requestMultipart('/eleves/import-photos', formData)
+  },
+  telechargerModeleEleves: async () => {
+    const res = await fetch(`${API_URL}/eleves/modele`, { headers: { ...authHeaders() } })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || `Erreur ${res.status}`)
+    }
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'modele_import_eleves.xlsx'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  },
 
   getEtablissement: () => request('/etablissement'),
   saveEtablissement: (payload) =>
