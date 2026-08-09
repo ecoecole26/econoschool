@@ -95,7 +95,7 @@ export default function TypesDeFrais() {
       {loading ? (
         <div className="text-sm text-[#6b7d74]">Chargement…</div>
       ) : (
-        <div className="space-y-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {types.map((type) => {
             const atMax = type.tranches.length >= type.echeances_max
             return (
@@ -155,7 +155,7 @@ export default function TypesDeFrais() {
           })}
 
           {types.length === 0 && (
-            <div className="text-sm text-[#6b7d74] bg-white rounded-2xl border border-[#e3ebe6] p-8 text-center">
+            <div className="col-span-full text-sm text-[#6b7d74] bg-white rounded-2xl border border-[#e3ebe6] p-8 text-center">
               Aucun type de frais trouvé — exécute la migration SQL{' '}
               <code>003_types_frais.sql</code> dans Supabase.
             </div>

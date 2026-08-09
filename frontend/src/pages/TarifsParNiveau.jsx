@@ -44,7 +44,7 @@ export default function TarifsParNiveau() {
       <PageHeader
         icon="💰"
         title="Tarifs par niveau"
-        subtitle="Définir les frais par niveau (en FCFA)."
+        subtitle="Définir les frais par niveau (en FCFA). Un élève Affecté ne paie généralement pas la scolarité (mets 0), mais paie les frais d'inscription et annexes comme tout le monde."
         onSave={handleSave}
         saving={saving}
       />
@@ -73,11 +73,18 @@ export default function TarifsParNiveau() {
                 </span>
               }
             >
-              <Field label="Scolarité annuelle (FCFA)">
+              <Field label="Scolarité annuelle — Affecté (FCFA)">
                 <TextInput
                   type="number"
-                  value={t.scolarite_annuelle ?? 0}
-                  onChange={setField(t.id, 'scolarite_annuelle')}
+                  value={t.scolarite_affecte ?? 0}
+                  onChange={setField(t.id, 'scolarite_affecte')}
+                />
+              </Field>
+              <Field label="Scolarité annuelle — Non affecté (FCFA)">
+                <TextInput
+                  type="number"
+                  value={t.scolarite_non_affecte ?? 0}
+                  onChange={setField(t.id, 'scolarite_non_affecte')}
                 />
               </Field>
               <Field label="Frais d'inscription (FCFA)">
