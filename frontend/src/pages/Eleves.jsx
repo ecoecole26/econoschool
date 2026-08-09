@@ -40,6 +40,8 @@ export default function Eleves() {
   })
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   async function load() {
     setLoading(true)
@@ -89,6 +91,25 @@ export default function Eleves() {
       setEditError(err.message || 'Erreur lors de la mise à jour')
     } finally {
       setSaving(false)
+    }
+  }
+
+  function openDelete(el) {
+    setToDelete(el)
+    setDeleteError('')
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      await api.deleteEleve(toDelete.id)
+      setToDelete(null)
+      load()
+    } catch (err) {
+      setDeleteError(err.message || 'Erreur lors de la suppression')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -233,7 +254,7 @@ export default function Eleves() {
                       <IconButton
                         variant="danger"
                         title="Supprimer"
-                        onClick={() => setToDelete(el)}
+                        onClick={() => openDelete(el)}
                       >
                         🗑️
                       </IconButton>
@@ -397,24 +418,33 @@ export default function Eleves() {
           <>
             <button
               onClick={() => setToDelete(null)}
-              className="px-4 py-2 rounded-lg border border-[#d7e8de] text-sm font-semibold text-[#6b7d74]"
+              disabled={deleting}
+              className="px-4 py-2 rounded-lg border border-[#d7e8de] text-sm font-semibold text-[#6b7d74] disabled:opacity-60"
             >
               Annuler
             </button>
             <button
-              onClick={() => setToDelete(null) /* branchement suppression réelle : étape suivante */}
-              className="px-4 py-2 rounded-lg bg-danger text-white text-sm font-semibold"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-4 py-2 rounded-lg bg-danger text-white text-sm font-semibold disabled:opacity-60"
             >
-              Supprimer
+              {deleting ? 'Suppression…' : 'Supprimer'}
             </button>
           </>
         }
       >
         {toDelete && (
-          <p className="text-sm text-[#3d4f45]">
-            Tu es sur le point de supprimer <b>{toDelete.nom}</b> ({toDelete.matricule}). Cette
-            action est irréversible.
-          </p>
+          <div className="space-y-3">
+            <p className="text-sm text-[#3d4f45]">
+              Tu es sur le point de supprimer <b>{toDelete.nom}</b> ({toDelete.matricule}). Cette
+              action est irréversible.
+            </p>
+            {deleteError && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                {deleteError}
+              </div>
+            )}
+          </div>
         )}
       </Modal>
     </Layout>

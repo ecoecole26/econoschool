@@ -91,6 +91,51 @@ router.put('/:id', requireAuth, async (req, res) => {
   res.json({ eleve: data })
 })
 
+// DELETE /api/eleves/:id
+router.delete('/:id', requireAuth, async (req, res) => {
+  if (req.user.role !== 'fondateur') {
+    return res.status(403).json({ error: 'Seul le Fondateur peut supprimer un élève' })
+  }
+
+  const { id } = req.params
+
+  const { data: eleve, error: erreurRecherche } = await supabase
+    .from('eleves')
+    .select('id, photo_url')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (erreurRecherche) {
+    console.error('[eleves] erreur recherche avant suppression:', erreurRecherche.message)
+    return res.status(500).json({ error: "Erreur lors de la recherche de l'élève" })
+  }
+
+  if (!eleve) {
+    return res.status(404).json({ error: 'Élève introuvable' })
+  }
+
+  // Suppression de la photo dans le bucket (best-effort : on ne bloque pas
+  // la suppression de l'élève si ça échoue, ex. photo déjà absente).
+  if (eleve.photo_url) {
+    const chemin = eleve.photo_url.split('/').pop()
+    if (chemin) {
+      const { error: erreurStorage } = await supabase.storage.from(PHOTOS_BUCKET).remove([chemin])
+      if (erreurStorage) {
+        console.warn('[eleves] échec suppression photo:', erreurStorage.message)
+      }
+    }
+  }
+
+  const { error } = await supabase.from('eleves').delete().eq('id', id)
+
+  if (error) {
+    console.error('[eleves] erreur suppression:', error.message)
+    return res.status(500).json({ error: "Erreur lors de la suppression de l'élève" })
+  }
+
+  res.json({ ok: true })
+})
+
 // ---------- Import ZIP (CSV + photos) ----------
 
 function normaliseCle(str) {

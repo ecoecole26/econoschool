@@ -51,6 +51,7 @@ export const api = {
   },
   updateEleve: (id, payload) =>
     request(`/eleves/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteEleve: (id) => request(`/eleves/${id}`, { method: 'DELETE' }),
   importEleves: (file) => {
     const formData = new FormData()
     formData.append('file', file)

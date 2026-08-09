@@ -8,6 +8,8 @@ import { api } from '../lib/api.js'
 // id (text, = nom), nom, ville, telephone, email, annee, logo_url, statut_ecole, created_at
 // + colonnes ajoutées (voir backend/migrations/001_etablissements_colonnes.sql) :
 // code_etablissement, adresse, type, academie, devise
+// + colonnes bancaires (voir backend/migrations/005_etablissements_banque.sql) :
+// banque_nom, banque_titulaire, banque_rib, banque_iban
 const EMPTY = {
   nom: '',
   ville: '',
@@ -20,7 +22,11 @@ const EMPTY = {
   adresse: '',
   type: 'Collège',
   academie: '',
-  devise: 'FCFA'
+  devise: 'FCFA',
+  banque_nom: '',
+  banque_titulaire: '',
+  banque_rib: '',
+  banque_iban: ''
 }
 
 export default function ParametresEtablissement() {
@@ -137,6 +143,45 @@ export default function ParametresEtablissement() {
               placeholder="Sera remplacé par un vrai bouton d'upload à l'étape suivante"
             />
           </Field>
+        </Card>
+      )}
+
+      {!loading && (
+        <Card title="Coordonnées bancaires" icon="🏦" className="mt-5">
+          <p className="text-xs text-[#6b7d74] mb-4">
+            Affichées sur les reçus pour les virements de frais de scolarité. Le suivi des
+            mouvements réels (rapprochement bancaire) est une étape à part.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+            <Field label="Banque">
+              <TextInput
+                value={form.banque_nom || ''}
+                onChange={set('banque_nom')}
+                placeholder="Ex: SGBCI, NSIA Banque"
+              />
+            </Field>
+            <Field label="Titulaire du compte">
+              <TextInput
+                value={form.banque_titulaire || ''}
+                onChange={set('banque_titulaire')}
+                placeholder="Ex: Collège Moderne Bouaké Dar Es Salam"
+              />
+            </Field>
+            <Field label="RIB">
+              <TextInput
+                value={form.banque_rib || ''}
+                onChange={set('banque_rib')}
+                placeholder="24 chiffres"
+              />
+            </Field>
+            <Field label="IBAN">
+              <TextInput
+                value={form.banque_iban || ''}
+                onChange={set('banque_iban')}
+                placeholder="Optionnel — virements internationaux"
+              />
+            </Field>
+          </div>
         </Card>
       )}
     </Layout>
