@@ -39,17 +39,15 @@ export default function Login() {
       <div className="w-full max-w-[1180px] bg-white rounded-[32px] shadow-[0_40px_90px_rgba(11,61,36,0.22)] overflow-hidden flex flex-col md:flex-row min-h-[720px]">
 
         {/* Panneau gauche - logo */}
-        <div className="md:w-[42%] flex items-center justify-center p-10 bg-gradient-to-br from-[#052e16] via-[#146c43] to-[#1a8551]">
-          <div className="flex flex-col items-center gap-6">
-            <div className="w-[340px] h-[340px] bg-white rounded-full flex items-center justify-center shadow-[0_24px_55px_rgba(0,0,0,0.3)] border-[6px] border-white/20 p-9">
+        <div className="md:w-1/2 flex items-center justify-center p-10 bg-gradient-to-br from-[#052e16] via-[#146c43] to-[#1a8551]">
+          <div className="flex flex-col items-center gap-7">
+            <div className="w-[380px] h-[380px] bg-white rounded-full flex items-center justify-center shadow-[0_24px_55px_rgba(0,0,0,0.3)] border-[6px] border-white/20 p-3">
               <img src="/logo-icon.png" alt="Logo EconoSchool" className="w-full h-full object-contain" />
             </div>
             <div className="text-center">
-              <span className="block font-display font-extrabold text-[50px] leading-tight tracking-wide text-white">
-                ECONO
-              </span>
-              <span className="block font-display font-extrabold text-[50px] leading-tight tracking-[0.15em] text-orange-clair">
-                SCHOOL
+              <span className="block font-display font-extrabold text-[38px] leading-tight whitespace-nowrap">
+                <span className="text-white">ECONO </span>
+                <span className="text-orange-clair tracking-[0.1em]">SCHOOL</span>
               </span>
               <div className="mt-3 text-base tracking-[0.1em] uppercase text-white/70">
                 Gestion d'économat scolaire
@@ -59,7 +57,7 @@ export default function Login() {
         </div>
 
         {/* Panneau droit - formulaire */}
-        <div className="md:w-[58%] px-10 py-14 md:px-[80px] flex flex-col justify-center">
+        <div className="md:w-1/2 px-10 py-14 md:px-[80px] flex flex-col justify-center">
           <h3 className="text-[44px] font-display font-bold text-vert-fonce mb-3">Connexion</h3>
           <p className="text-lg text-[#6b7d74] mb-10 leading-relaxed">
             Entrez vos identifiants pour accéder à votre espace.
@@ -69,7 +67,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => setRole('fondateur')}
-              className={`flex-1 text-center py-4 px-3 rounded-xl text-lg font-semibold transition ${
+              className={`flex-1 text-center py-3 px-2 rounded-xl text-base font-semibold transition ${
                 role === 'fondateur'
                   ? 'bg-white text-[#8a5b00] shadow-sm'
                   : 'text-[#7a4a34]'
@@ -79,8 +77,19 @@ export default function Login() {
             </button>
             <button
               type="button"
+              onClick={() => setRole('proviseur')}
+              className={`flex-1 text-center py-3 px-2 rounded-xl text-base font-semibold transition ${
+                role === 'proviseur'
+                  ? 'bg-white text-[#8a5b00] shadow-sm'
+                  : 'text-[#7a4a34]'
+              }`}
+            >
+              🎓 Proviseur
+            </button>
+            <button
+              type="button"
               onClick={() => setRole('econome')}
-              className={`flex-1 text-center py-4 px-3 rounded-xl text-lg font-semibold transition ${
+              className={`flex-1 text-center py-3 px-2 rounded-xl text-base font-semibold transition ${
                 role === 'econome'
                   ? 'bg-white text-[#8a5b00] shadow-sm'
                   : 'text-[#7a4a34]'
@@ -91,7 +100,7 @@ export default function Login() {
           </div>
 
           <form onSubmit={handleSubmit}>
-            <div className="mb-8">
+            <div className="mb-6">
               <label className="block text-center text-lg font-bold text-vert-fonce mb-3">
                 Mot de passe
               </label>

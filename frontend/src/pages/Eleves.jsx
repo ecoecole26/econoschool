@@ -17,6 +17,10 @@ export default function Eleves() {
 
   const [selected, setSelected] = useState(null) // élève ouvert dans la popup "voir"
   const [toDelete, setToDelete] = useState(null) // élève ciblé par la popup "supprimer"
+  const [editing, setEditing] = useState(null) // élève ouvert dans la popup "modifier"
+  const [editForm, setEditForm] = useState({ nom: '', classe: '', statut: 'Actif' })
+  const [saving, setSaving] = useState(false)
+  const [editError, setEditError] = useState('')
 
   async function load() {
     setLoading(true)
@@ -42,34 +46,54 @@ export default function Eleves() {
     load()
   }
 
+  function openEdit(el) {
+    setEditing(el)
+    setEditForm({ nom: el.nom || '', classe: el.classe || '', statut: el.statut || 'Actif' })
+    setEditError('')
+  }
+
+  async function handleSaveEdit() {
+    setSaving(true)
+    setEditError('')
+    try {
+      await api.updateEleve(editing.id, editForm)
+      setEditing(null)
+      load()
+    } catch (err) {
+      setEditError(err.message || 'Erreur lors de la mise à jour')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const actifs = eleves.filter((e) => (e.statut || '').toLowerCase() === 'actif').length
 
   return (
     <Layout title="Élèves">
       {/* Barre de recherche */}
-      <form onSubmit={handleSearchSubmit} className="flex justify-center gap-3 mb-8">
+      <form onSubmit={handleSearchSubmit} className="flex justify-center gap-3 mb-5">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Rechercher un élève (nom, matricule)…"
-          className="w-full max-w-md px-4 py-2.5 border border-[#d7e8de] rounded-xl text-sm bg-white focus:outline-none focus:border-teal"
+          className="w-full max-w-sm px-4 py-2 border border-[#d7e8de] rounded-xl text-sm bg-white focus:outline-none focus:border-teal"
         />
         <button
           type="submit"
-          className="px-5 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold"
+          className="px-5 py-2 rounded-xl bg-vert-fonce text-white text-sm font-semibold"
         >
           Rechercher
         </button>
       </form>
 
-      <div className="bg-white rounded-2xl border border-[#e3ebe6] p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+      <div className="bg-white rounded-2xl border border-[#e3ebe6] p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-2.5">
           <h2 className="text-lg font-display font-bold text-vert-fonce">
             Élèves — {classe ? classe : 'Toutes classes'}
           </h2>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="flex flex-wrap items-center gap-3 mb-3">
           <SegmentedTabs
             value={tab}
             onChange={setTab}
@@ -96,7 +120,7 @@ export default function Eleves() {
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-5">
+        <div className="flex flex-wrap gap-2 mb-4">
           <StatPill label="Effectif total" value={total} variant="vert" />
           <StatPill label="Actifs" value={actifs} variant="teal" />
         </div>
@@ -115,29 +139,36 @@ export default function Eleves() {
         ) : loading ? (
           <div className="text-center text-sm text-[#6b7d74] py-16">Chargement…</div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-[16%]" />
+              <col className="w-[38%]" />
+              <col className="w-[14%]" />
+              <col className="w-[14%]" />
+              <col className="w-[18%]" />
+            </colgroup>
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
-                <th className="py-2.5 pr-3">Matricule</th>
-                <th className="py-2.5 pr-3">Nom</th>
-                <th className="py-2.5 pr-3">Classe</th>
-                <th className="py-2.5 pr-3">Statut</th>
-                <th className="py-2.5 pr-3 text-right">Actions</th>
+                <th className="py-1.5 pr-3">Matricule</th>
+                <th className="py-1.5 pr-3">Nom</th>
+                <th className="py-1.5 pr-3">Classe</th>
+                <th className="py-1.5 pr-3">Statut</th>
+                <th className="py-1.5 pr-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {eleves.map((el) => (
                 <tr key={el.id} className="border-b border-[#f1f5f2] hover:bg-[#f8fbf9]">
-                  <td className="py-2.5 pr-3 font-medium text-vert-fonce">{el.matricule}</td>
-                  <td className="py-2.5 pr-3">{el.nom}</td>
-                  <td className="py-2.5 pr-3">{el.classe}</td>
-                  <td className="py-2.5 pr-3">{el.statut}</td>
-                  <td className="py-2.5 pr-3">
+                  <td className="py-1.5 pr-3 font-medium text-vert-fonce truncate">{el.matricule}</td>
+                  <td className="py-1.5 pr-3 truncate">{el.nom}</td>
+                  <td className="py-1.5 pr-3 truncate">{el.classe}</td>
+                  <td className="py-1.5 pr-3 truncate">{el.statut}</td>
+                  <td className="py-1.5 pr-3">
                     <div className="flex justify-end gap-2">
                       <IconButton variant="teal" title="Voir" onClick={() => setSelected(el)}>
                         👁️
                       </IconButton>
-                      <IconButton variant="orange" title="Modifier">
+                      <IconButton variant="orange" title="Modifier" onClick={() => openEdit(el)}>
                         ✏️
                       </IconButton>
                       <IconButton
@@ -171,6 +202,77 @@ export default function Eleves() {
             <Row label="Nom" value={selected.nom} />
             <Row label="Classe" value={selected.classe} />
             <Row label="Statut" value={selected.statut} />
+          </div>
+        )}
+      </Modal>
+
+      {/* Popup "modifier l'élève" */}
+      <Modal
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title="Modifier l'élève"
+        footer={
+          <>
+            <button
+              onClick={() => setEditing(null)}
+              className="px-4 py-2 rounded-lg border border-[#d7e8de] text-sm font-semibold text-[#6b7d74]"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleSaveEdit}
+              disabled={saving}
+              className="px-4 py-2 rounded-lg bg-vert-fonce text-white text-sm font-semibold disabled:opacity-60"
+            >
+              {saving ? 'Sauvegarde…' : 'Sauvegarder'}
+            </button>
+          </>
+        }
+      >
+        {editing && (
+          <div className="space-y-4">
+            <div className="text-xs text-[#6b7d74]">
+              Matricule <span className="font-medium text-vert-fonce">{editing.matricule}</span>{' '}
+              (non modifiable)
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-[#3d4f45] mb-1.5">Nom</label>
+              <input
+                value={editForm.nom}
+                onChange={(e) => setEditForm((f) => ({ ...f, nom: e.target.value }))}
+                className="w-full px-3.5 py-2.5 border border-[#d7e8de] rounded-lg text-sm focus:outline-none focus:border-teal"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-[#3d4f45] mb-1.5">Classe</label>
+              <input
+                value={editForm.classe}
+                onChange={(e) => setEditForm((f) => ({ ...f, classe: e.target.value }))}
+                className="w-full px-3.5 py-2.5 border border-[#d7e8de] rounded-lg text-sm focus:outline-none focus:border-teal"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-[#3d4f45] mb-1.5">Statut</label>
+              <select
+                value={editForm.statut}
+                onChange={(e) => setEditForm((f) => ({ ...f, statut: e.target.value }))}
+                className="w-full px-3.5 py-2.5 border border-[#d7e8de] rounded-lg text-sm focus:outline-none focus:border-teal"
+              >
+                <option>Actif</option>
+                <option>Inactif</option>
+                <option>Transféré</option>
+                <option>Exclu</option>
+              </select>
+            </div>
+
+            {editError && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                {editError}
+              </div>
+            )}
           </div>
         )}
       </Modal>

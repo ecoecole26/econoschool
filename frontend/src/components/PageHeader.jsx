@@ -4,7 +4,7 @@
  */
 export default function PageHeader({ icon, title, subtitle, onSave, saving, saveLabel = 'Sauvegarder' }) {
   return (
-    <div className="flex items-start justify-between mb-7">
+    <div className="flex items-start justify-between mb-5">
       <div>
         <h2 className="text-2xl font-display font-bold text-vert-fonce flex items-center gap-2.5">
           <span>{icon}</span> {title}

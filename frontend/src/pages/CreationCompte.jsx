@@ -6,14 +6,19 @@ import { Card, Field, TextInput } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
 
 const EMPTY_COMPTE = { nom_complet: '', login: '', mot_de_passe: '' }
+const ROLES = ['fondateur', 'proviseur', 'econome']
 
 export default function CreationCompte() {
   const isLoggedIn = !!localStorage.getItem('econoschool_token')
   const [needsBootstrap, setNeedsBootstrap] = useState(false)
-  const [comptes, setComptes] = useState({ fondateur: EMPTY_COMPTE, econome: EMPTY_COMPTE })
+  const [comptes, setComptes] = useState({
+    fondateur: EMPTY_COMPTE,
+    proviseur: EMPTY_COMPTE,
+    econome: EMPTY_COMPTE
+  })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(null)
-  const [message, setMessage] = useState({ fondateur: '', econome: '' })
+  const [message, setMessage] = useState({ fondateur: '', proviseur: '', econome: '' })
 
   useEffect(() => {
     api
@@ -24,6 +29,7 @@ export default function CreationCompte() {
           return api.getComptes().then(({ comptes: c }) => {
             setComptes({
               fondateur: c.fondateur ? { ...c.fondateur, mot_de_passe: '' } : EMPTY_COMPTE,
+              proviseur: c.proviseur ? { ...c.proviseur, mot_de_passe: '' } : EMPTY_COMPTE,
               econome: c.econome ? { ...c.econome, mot_de_passe: '' } : EMPTY_COMPTE
             })
           })
@@ -112,13 +118,13 @@ export default function CreationCompte() {
       <PageHeader
         icon="👤"
         title="Création de compte"
-        subtitle="Un compte Fondateur (accès complet) et un compte Économe (gestion courante)."
+        subtitle="Fondateur (accès complet), Proviseur et Économe (accès restreints)."
       />
 
       {loading ? (
         <div className="text-sm text-[#6b7d74]">Chargement…</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <CompteCard
             role="fondateur"
             icon="👑"
@@ -128,6 +134,16 @@ export default function CreationCompte() {
             onSave={() => handleSave('fondateur')}
             saving={saving === 'fondateur'}
             message={message.fondateur}
+          />
+          <CompteCard
+            role="proviseur"
+            icon="🎓"
+            title="Compte Proviseur"
+            data={comptes.proviseur}
+            setField={setField}
+            onSave={() => handleSave('proviseur')}
+            saving={saving === 'proviseur'}
+            message={message.proviseur}
           />
           <CompteCard
             role="econome"

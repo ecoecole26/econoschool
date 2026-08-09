@@ -11,7 +11,7 @@ export default function Topbar({ title }) {
   }
 
   return (
-    <header className="flex items-center justify-between px-8 py-5 bg-white border-b border-[#e3ebe6]">
+    <header className="flex items-center justify-between px-8 py-3.5 bg-white border-b border-[#e3ebe6]">
       <h1 className="text-2xl font-display font-bold text-vert-fonce">{title}</h1>
       <div className="flex items-center gap-4">
         <div className="text-right leading-tight">

@@ -58,7 +58,7 @@ export default function ParametresEtablissement() {
   }
 
   return (
-    <Layout title="Paramètres">
+    <Layout title="Identification établissement">
       <PageHeader
         icon="⚙️"
         title="Identification de l'établissement"

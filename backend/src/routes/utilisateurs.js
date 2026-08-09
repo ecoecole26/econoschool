@@ -4,7 +4,7 @@ import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 
 const router = Router()
-const ROLES = ['fondateur', 'econome']
+const ROLES = ['fondateur', 'proviseur', 'econome']
 
 // GET /api/utilisateurs -> les 2 comptes (sans jamais renvoyer le mot de passe)
 router.get('/', requireAuth, async (req, res) => {

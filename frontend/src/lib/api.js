@@ -31,6 +31,8 @@ export const api = {
     const qs = new URLSearchParams(params).toString()
     return request(`/eleves${qs ? `?${qs}` : ''}`)
   },
+  updateEleve: (id, payload) =>
+    request(`/eleves/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
 
   getEtablissement: () => request('/etablissement'),
   saveEtablissement: (payload) =>
@@ -39,5 +41,14 @@ export const api = {
   getComptes: () => request('/utilisateurs'),
   getBootstrapStatus: () => request('/utilisateurs/bootstrap-status'),
   saveCompte: (role, payload) =>
-    request(`/utilisateurs/${role}`, { method: 'PUT', body: JSON.stringify(payload) })
+    request(`/utilisateurs/${role}`, { method: 'PUT', body: JSON.stringify(payload) }),
+
+  getTarifs: () => request('/tarifs'),
+  saveTarifs: (tarifs) => request('/tarifs', { method: 'PUT', body: JSON.stringify({ tarifs }) }),
+
+  getTypesFrais: () => request('/types-frais'),
+  addTranche: (typeId) => request(`/types-frais/${typeId}/tranches`, { method: 'POST' }),
+  deleteTranche: (id) => request(`/types-frais/tranches/${id}`, { method: 'DELETE' }),
+  saveTranches: (tranches) =>
+    request('/types-frais/tranches', { method: 'PUT', body: JSON.stringify({ tranches }) })
 }

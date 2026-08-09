@@ -7,7 +7,7 @@ export default function Layout({ title, children }) {
       <Sidebar />
       <div className="flex-1 flex flex-col">
         <Topbar title={title} />
-        <main className="flex-1 px-8 py-8">{children}</main>
+        <main className="flex-1 px-8 py-5">{children}</main>
       </div>
     </div>
   )

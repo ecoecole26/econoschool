@@ -37,4 +37,28 @@ router.get('/', requireAuth, async (req, res) => {
   res.json({ eleves: data, total: count })
 })
 
+// PUT /api/eleves/:id  { nom, classe, statut }
+router.put('/:id', requireAuth, async (req, res) => {
+  const { id } = req.params
+  const { nom, classe, statut } = req.body || {}
+
+  if (!nom || !classe) {
+    return res.status(400).json({ error: 'Nom et classe sont requis' })
+  }
+
+  const { data, error } = await supabase
+    .from('eleves')
+    .update({ nom, classe, statut })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[eleves] erreur mise à jour:', error.message)
+    return res.status(500).json({ error: "Erreur lors de la mise à jour de l'élève" })
+  }
+
+  res.json({ eleve: data })
+})
+
 export default router

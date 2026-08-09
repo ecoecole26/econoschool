@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 import { supabase } from '../config/supabase.js'
 
 const router = Router()
-const ROLES = ['fondateur', 'econome']
+const ROLES = ['fondateur', 'proviseur', 'econome']
 
 // Authentification réelle : on va chercher le compte dans la table `utilisateurs`
 // (rempli/modifié depuis la page "Création de compte"), plus de mot de passe
