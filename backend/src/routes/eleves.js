@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import multer from 'multer'
-import AdmZip from 'adm-zip'
 import * as XLSX from 'xlsx'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
@@ -10,8 +9,12 @@ const router = Router()
 // Upload en mémoire (le fichier ne touche jamais le disque).
 // Fichier Excel seul : 50 Mo suffisent largement.
 const uploadExcel = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } })
-// Zip de photos : peut être volumineux (plusieurs centaines de photos), on monte à 300 Mo.
-const uploadZip = multer({ storage: multer.memoryStorage(), limits: { fileSize: 300 * 1024 * 1024 } })
+// Photos : le zip est désormais dézippé côté navigateur et envoyé par lots
+// de fichiers individuels (voir ImportEleves.jsx) — 15 Mo/photo est large.
+const uploadZip = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 }
+})
 
 const PHOTOS_BUCKET = 'photos-eleves'
 
@@ -213,39 +216,35 @@ router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res)
   res.json({ importes, mis_a_jour, total_lignes: rows.length, erreurs })
 })
 
-// POST /api/eleves/import-photos  (multipart/form-data, champ "file" = un .zip)
-// Le zip doit contenir des photos dont le nom de fichier (sans l'extension)
-// correspond exactement au matricule de l'élève (ex : 21421986V.jpg).
-// Chaque photo est associée automatiquement à l'élève déjà existant.
-router.post('/import-photos', requireAuth, uploadZip.single('file'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Aucun fichier reçu (champ "file" attendu)' })
-  }
-
-  let zip
-  try {
-    zip = new AdmZip(req.file.buffer)
-  } catch {
-    return res.status(400).json({ error: "Le fichier envoyé n'est pas un zip valide" })
-  }
-
-  const entries = zip.getEntries().filter(
-    (e) => !e.isDirectory && /\.(jpe?g|png|webp)$/i.test(e.entryName)
-  )
-
-  if (entries.length === 0) {
-    return res.status(400).json({ error: 'Aucune photo (jpg/jpeg/png/webp) trouvée dans le zip' })
+// POST /api/eleves/import-photos  (multipart/form-data, champ "photos" = plusieurs fichiers)
+// Le navigateur dézippe le .zip lui-même et envoie les photos par petits lots
+// (voir ImportEleves.jsx) — cette route ne reçoit donc jamais le zip complet
+// d'un coup, seulement quelques dizaines de photos par appel, léger pour le serveur.
+// Chaque photo doit être nommée "MATRICULE.jpg" (ou .jpeg/.png/.webp).
+router.post('/import-photos', requireAuth, uploadZip.array('photos', 200), async (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ error: 'Aucune photo reçue (champ "photos" attendu)' })
   }
 
   let importees = 0
   const non_trouves = []
   const erreurs = []
 
-  for (const entry of entries) {
-    const nomFichier = entry.entryName.split('/').pop()
-    // Le nom du fichier photo doit correspondre au matricule (comparaison
-    // insensible à la casse, car les photos scannées ont parfois une casse différente).
-    const matricule = nomFichier.replace(/\.[^.]+$/, '').trim()
+  for (const fichier of req.files) {
+    const nomFichier = fichier.originalname
+    // Windows ajoute parfois un suffixe sur les doublons : "21421986V - Copie.jpg",
+    // "21421986V (1).jpg" — on nettoie ça pour retrouver le vrai matricule.
+    const matricule = nomFichier
+      .replace(/\.[^.]+$/, '')
+      .replace(/\s*-\s*copie(\s*\(\d+\))?\s*$/i, '')
+      .replace(/\s*-\s*copy(\s*\(\d+\))?\s*$/i, '')
+      .replace(/\s*\(\d+\)\s*$/, '')
+      .trim()
+
+    if (!matricule) {
+      erreurs.push(`${nomFichier} : nom de fichier illisible`)
+      continue
+    }
 
     try {
       const { data: existant, error: erreurRecherche } = await supabase
@@ -261,13 +260,15 @@ router.post('/import-photos', requireAuth, uploadZip.single('file'), async (req,
         continue
       }
 
-      const buffer = entry.getData()
-      const ext = nomFichier.split('.').pop().toLowerCase()
+      const ext = (nomFichier.split('.').pop() || 'jpg').toLowerCase()
       const chemin = `${existant.matricule}.${ext}`
 
       const { error: uploadError } = await supabase.storage
         .from(PHOTOS_BUCKET)
-        .upload(chemin, buffer, { upsert: true, contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` })
+        .upload(chemin, fichier.buffer, {
+          upsert: true,
+          contentType: fichier.mimetype || `image/${ext === 'jpg' ? 'jpeg' : ext}`
+        })
 
       if (uploadError) {
         erreurs.push(`${nomFichier} : échec upload — ${uploadError.message}`)
@@ -289,7 +290,7 @@ router.post('/import-photos', requireAuth, uploadZip.single('file'), async (req,
     }
   }
 
-  res.json({ importees, total_photos: entries.length, non_trouves, erreurs })
+  res.json({ importees, total_photos: req.files.length, non_trouves, erreurs })
 })
 
 export default router

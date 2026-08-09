@@ -56,9 +56,9 @@ export const api = {
     formData.append('file', file)
     return requestMultipart('/eleves/import', formData)
   },
-  importPhotosEleves: (file) => {
+  importPhotosEleves: (fichiers) => {
     const formData = new FormData()
-    formData.append('file', file)
+    fichiers.forEach((f) => formData.append('photos', f))
     return requestMultipart('/eleves/import-photos', formData)
   },
   telechargerModeleEleves: async () => {

@@ -1,8 +1,11 @@
 import { useRef, useState } from 'react'
+import JSZip from 'jszip'
 import Layout from '../components/Layout.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import { Card } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
+
+const TAILLE_LOT = 25 // photos envoyées par requête — reste léger pour le serveur
 
 // Petit badge coloré pour les résultats d'import (créés / mis à jour / erreurs...).
 function Badge({ children, className }) {
@@ -39,6 +42,7 @@ export default function ImportEleves() {
   const fileInputPhotos = useRef(null)
   const [fichierPhotos, setFichierPhotos] = useState(null)
   const [importingPhotos, setImportingPhotos] = useState(false)
+  const [progressionPhotos, setProgressionPhotos] = useState(null) // { fait, total }
   const [resultPhotos, setResultPhotos] = useState(null)
   const [erreurPhotos, setErreurPhotos] = useState('')
 
@@ -80,15 +84,50 @@ export default function ImportEleves() {
     setImportingPhotos(true)
     setErreurPhotos('')
     setResultPhotos(null)
+    setProgressionPhotos(null)
+
     try {
-      const res = await api.importPhotosEleves(fichierPhotos)
-      setResultPhotos(res)
+      // 1. Dézippage dans le navigateur — le zip complet (même 200+ Mo) ne
+      // transite jamais tel quel vers le serveur, seulement les photos une
+      // par une regroupées en petits lots juste après.
+      const zip = await JSZip.loadAsync(fichierPhotos)
+      const entrees = Object.values(zip.files).filter(
+        (f) => !f.dir && /\.(jpe?g|png|webp)$/i.test(f.name)
+      )
+
+      if (entrees.length === 0) {
+        throw new Error('Aucune photo (jpg/jpeg/png/webp) trouvée dans ce zip.')
+      }
+
+      const cumul = { importees: 0, total_photos: entrees.length, non_trouves: [], erreurs: [] }
+      setProgressionPhotos({ fait: 0, total: entrees.length })
+
+      for (let i = 0; i < entrees.length; i += TAILLE_LOT) {
+        const lot = entrees.slice(i, i + TAILLE_LOT)
+        const fichiers = await Promise.all(
+          lot.map(async (entree) => {
+            const blob = await entree.async('blob')
+            const nom = entree.name.split('/').pop()
+            return new File([blob], nom, { type: blob.type || 'image/jpeg' })
+          })
+        )
+
+        const resLot = await api.importPhotosEleves(fichiers)
+        cumul.importees += resLot.importees || 0
+        cumul.non_trouves.push(...(resLot.non_trouves || []))
+        cumul.erreurs.push(...(resLot.erreurs || []))
+
+        setProgressionPhotos({ fait: Math.min(i + TAILLE_LOT, entrees.length), total: entrees.length })
+      }
+
+      setResultPhotos(cumul)
       setFichierPhotos(null)
       if (fileInputPhotos.current) fileInputPhotos.current.value = ''
     } catch (err) {
       setErreurPhotos(err.message || "Erreur lors de l'import des photos")
     } finally {
       setImportingPhotos(false)
+      setProgressionPhotos(null)
     }
   }
 
@@ -221,8 +260,23 @@ export default function ImportEleves() {
             disabled={!fichierPhotos || importingPhotos}
             className="w-full px-5 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold disabled:opacity-50"
           >
-            {importingPhotos ? 'Import en cours…' : 'Importer les photos'}
+            {importingPhotos
+              ? progressionPhotos
+                ? `Import… ${progressionPhotos.fait}/${progressionPhotos.total}`
+                : 'Lecture du zip…'
+              : 'Importer les photos'}
           </button>
+
+          {progressionPhotos && (
+            <div className="mt-3 h-2 bg-[#f1f5f2] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-vert-clair transition-all"
+                style={{
+                  width: `${Math.round((progressionPhotos.fait / progressionPhotos.total) * 100)}%`
+                }}
+              />
+            </div>
+          )}
 
           {erreurPhotos && (
             <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
