@@ -44,7 +44,7 @@ export default function TarifsParNiveau() {
       <PageHeader
         icon="💰"
         title="Tarifs par niveau"
-        subtitle="Définir les frais par niveau (en FCFA). Un élève Affecté ne paie généralement pas la scolarité (mets 0), mais paie les frais d'inscription et annexes comme tout le monde."
+        subtitle="Définir les frais par niveau (en FCFA). Le total est calculé automatiquement."
         onSave={handleSave}
         saving={saving}
       />
@@ -59,59 +59,67 @@ export default function TarifsParNiveau() {
         <div className="text-sm text-[#6b7d74]">Chargement…</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {tarifs.map((t) => (
-            <Card
-              key={t.id}
-              title={
-                <span className="flex items-center gap-2">
-                  📘 {t.niveau}
-                  {t.examen && (
-                    <span className="text-[10px] font-semibold bg-[#fff1e0] text-orange px-2 py-0.5 rounded-full">
-                      Examen
-                    </span>
-                  )}
-                </span>
-              }
-            >
-              <Field label="Scolarité annuelle — Affecté (FCFA)">
-                <TextInput
-                  type="number"
-                  value={t.scolarite_affecte ?? 0}
-                  onChange={setField(t.id, 'scolarite_affecte')}
-                />
-              </Field>
-              <Field label="Scolarité annuelle — Non affecté (FCFA)">
-                <TextInput
-                  type="number"
-                  value={t.scolarite_non_affecte ?? 0}
-                  onChange={setField(t.id, 'scolarite_non_affecte')}
-                />
-              </Field>
-              <Field label="Frais d'inscription (FCFA)">
-                <TextInput
-                  type="number"
-                  value={t.frais_inscription ?? 0}
-                  onChange={setField(t.id, 'frais_inscription')}
-                />
-              </Field>
-              <Field label="Frais annexes (FCFA)">
-                <TextInput
-                  type="number"
-                  value={t.frais_annexes ?? 0}
-                  onChange={setField(t.id, 'frais_annexes')}
-                />
-              </Field>
-              {t.examen && (
-                <Field label="Frais examen (FCFA)">
+          {tarifs.map((t) => {
+            const total =
+              (Number(t.scolarite) || 0) +
+              (Number(t.frais_inscription) || 0) +
+              (Number(t.frais_annexes) || 0) +
+              (t.examen ? Number(t.frais_examen) || 0 : 0)
+
+            return (
+              <Card
+                key={t.id}
+                title={
+                  <span className="flex items-center gap-2">
+                    📘 {t.niveau}
+                    {t.examen && (
+                      <span className="text-[10px] font-semibold bg-[#fff1e0] text-orange px-2 py-0.5 rounded-full">
+                        Examen
+                      </span>
+                    )}
+                  </span>
+                }
+              >
+                <Field label="Scolarité annuelle (FCFA)">
                   <TextInput
                     type="number"
-                    value={t.frais_examen ?? 0}
-                    onChange={setField(t.id, 'frais_examen')}
+                    value={t.scolarite ?? 0}
+                    onChange={setField(t.id, 'scolarite')}
                   />
                 </Field>
-              )}
-            </Card>
-          ))}
+                <Field label="Frais d'inscription (FCFA)">
+                  <TextInput
+                    type="number"
+                    value={t.frais_inscription ?? 0}
+                    onChange={setField(t.id, 'frais_inscription')}
+                  />
+                </Field>
+                <Field label="Frais annexes (FCFA)">
+                  <TextInput
+                    type="number"
+                    value={t.frais_annexes ?? 0}
+                    onChange={setField(t.id, 'frais_annexes')}
+                  />
+                </Field>
+                {t.examen && (
+                  <Field label="Frais examen (FCFA)">
+                    <TextInput
+                      type="number"
+                      value={t.frais_examen ?? 0}
+                      onChange={setField(t.id, 'frais_examen')}
+                    />
+                  </Field>
+                )}
+
+                <div className="mt-3 pt-3 border-t border-[#e3ebe6] flex items-center justify-between">
+                  <span className="text-sm font-semibold text-vert-fonce">Total</span>
+                  <span className="text-base font-display font-bold text-vert-fonce">
+                    {total.toLocaleString('fr-FR')} FCFA
+                  </span>
+                </div>
+              </Card>
+            )
+          })}
 
           {tarifs.length === 0 && (
             <div className="col-span-full text-sm text-[#6b7d74] bg-white rounded-2xl border border-[#e3ebe6] p-8 text-center">

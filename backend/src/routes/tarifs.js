@@ -20,7 +20,7 @@ router.get('/', requireAuth, async (req, res) => {
   res.json({ tarifs: data })
 })
 
-// PUT /api/tarifs  { tarifs: [{ id, scolarite_affecte, scolarite_non_affecte, frais_inscription, frais_annexes, frais_examen }, ...] }
+// PUT /api/tarifs  { tarifs: [{ id, scolarite, frais_inscription, frais_annexes, frais_examen }, ...] }
 // Sauvegarde groupée de tous les niveaux en une fois (comme le bouton "Sauvegarder" unique de la page).
 router.put('/', requireAuth, async (req, res) => {
   if (req.user.role !== 'fondateur') {
@@ -34,14 +34,13 @@ router.put('/', requireAuth, async (req, res) => {
 
   const results = []
   for (const t of tarifs) {
-    const { id, scolarite_affecte, scolarite_non_affecte, frais_inscription, frais_annexes, frais_examen } = t
+    const { id, scolarite, frais_inscription, frais_annexes, frais_examen } = t
     if (!id) continue
 
     const { data, error } = await supabase
       .from('tarifs')
       .update({
-        scolarite_affecte: Number(scolarite_affecte) || 0,
-        scolarite_non_affecte: Number(scolarite_non_affecte) || 0,
+        scolarite: Number(scolarite) || 0,
         frais_inscription: Number(frais_inscription) || 0,
         frais_annexes: Number(frais_annexes) || 0,
         frais_examen: frais_examen === '' || frais_examen == null ? null : Number(frais_examen),
