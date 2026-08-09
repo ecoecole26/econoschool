@@ -81,15 +81,29 @@ function normaliseCle(str) {
     .toLowerCase()
 }
 
-function versBooleen(val) {
-  const v = normaliseCle(val)
-  return ['oui', 'yes', 'true', '1', 'affecte', 'redoublant'].includes(v)
+function normaliseValeur(val) {
+  return normaliseCle(val).replace(/\s+/g, '')
+}
+
+// Colonne "Statut" du fichier ministériel : "Affecte" / "Affecté" / "NAffecte".
+// Colonne "affecte" (fichier simplifié maison) : "Oui" / "Non".
+function estAffecte(val) {
+  const v = normaliseValeur(val)
+  return v === 'affecte' || v === 'oui' || v === 'yes' || v === 'true' || v === '1'
+}
+
+// Colonne "Qualité" du fichier ministériel : "Redoublant" / "NRedoublant".
+// Colonne "redoublant" (fichier simplifié maison) : "Oui" / "Non".
+function estRedoublant(val) {
+  const v = normaliseValeur(val)
+  return v === 'redoublant' || v === 'oui' || v === 'yes' || v === 'true' || v === '1'
 }
 
 // POST /api/eleves/import  (multipart/form-data, champ "file" = un .zip)
-// Le zip doit contenir : un fichier .xlsx (colonnes matricule, nom, classe,
-// niveau, affecte, redoublant, photo) + les fichiers photos référencés par
-// la colonne "photo" (nom de fichier exact, ex: 21421986V.jpg).
+// Le zip doit contenir : un fichier .xlsx avec au minimum les colonnes
+// Matricule, Nom, Classe (+ Prénom, Qualité, Statut si présentes — format
+// export ministériel reconnu directement) + les photos référencées par la
+// colonne "photo" (nom de fichier exact, ex: 21421986V.jpg), optionnelle.
 router.post('/import', requireAuth, upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Aucun fichier reçu (champ "file" attendu)' })
@@ -144,7 +158,9 @@ router.post('/import', requireAuth, upload.single('file'), async (req, res) => {
     const ligne = i + 2 // +2 : ligne 1 = en-têtes, index 0-based
 
     const matricule = String(row.matricule ?? '').trim()
-    const nom = String(row.nom ?? '').trim()
+    const nomSeul = String(row.nom ?? '').trim()
+    const prenom = String(row.prenom ?? '').trim()
+    const nom = prenom ? `${nomSeul} ${prenom}`.trim() : nomSeul
     const classe = String(row.classe ?? '').trim()
 
     if (!matricule || !nom || !classe) {
@@ -153,8 +169,10 @@ router.post('/import', requireAuth, upload.single('file'), async (req, res) => {
     }
 
     const niveau = String(row.niveau || '').trim() || classe.replace(/\d+$/, '').trim()
-    const affecte = versBooleen(row.affecte)
-    const redoublant = versBooleen(row.redoublant)
+    // "statut" = colonne ministérielle "Statut" (Affecte/NAffecte) ; "affecte" = fichier simplifié.
+    const affecte = estAffecte(row.statut || row.affecte)
+    // "qualite" = colonne ministérielle "Qualité" (Redoublant/NRedoublant) ; "redoublant" = fichier simplifié.
+    const redoublant = estRedoublant(row.qualite || row.redoublant)
 
     let photo_url
     const nomPhoto = (row.photo || '').trim()
@@ -182,8 +200,8 @@ router.post('/import', requireAuth, upload.single('file'), async (req, res) => {
       }
     }
 
-    const payload = { matricule, nom, classe, niveau, affecte, redoublant, statut: row.statut || 'Actif' }
-    if (photo_url) payload.photo_url = photo_url
+    const payloadCommun = { matricule, nom, classe, niveau, affecte, redoublant }
+    if (photo_url) payloadCommun.photo_url = photo_url
 
     try {
       const { data: existant } = await supabase
@@ -193,11 +211,15 @@ router.post('/import', requireAuth, upload.single('file'), async (req, res) => {
         .maybeSingle()
 
       if (existant) {
-        const { error } = await supabase.from('eleves').update(payload).eq('id', existant.id)
+        // Mise à jour : on ne touche pas au champ "statut" (Actif/Inactif/Transféré/Exclu),
+        // qui n'a rien à voir avec la colonne "Statut" (affectation) du fichier ministériel.
+        const { error } = await supabase.from('eleves').update(payloadCommun).eq('id', existant.id)
         if (error) throw error
         mis_a_jour++
       } else {
-        const { error } = await supabase.from('eleves').insert(payload)
+        const { error } = await supabase
+          .from('eleves')
+          .insert({ ...payloadCommun, statut: 'Actif' })
         if (error) throw error
         importes++
       }

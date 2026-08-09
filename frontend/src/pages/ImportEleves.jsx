@@ -45,18 +45,18 @@ export default function ImportEleves() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <Card title="Format attendu du zip" icon="📄">
           <p className="text-sm text-[#3d4f45] mb-3">
-            Le fichier .zip doit contenir, à la racine :
+            Le fichier .zip doit contenir, à la racine, votre fichier Excel du ministère{' '}
+            <b>tel quel, sans aucune modification</b>, plus les photos (optionnel).
           </p>
-          <ul className="text-sm text-[#6b7d74] list-disc pl-5 space-y-1 mb-4">
-            <li>Un fichier <b>.xlsx</b> (Excel) avec les colonnes suivantes, en première ligne :</li>
-          </ul>
           <div className="bg-[#f6f8f7] border border-[#e3ebe6] rounded-lg p-3 text-xs font-mono overflow-x-auto mb-4">
-            matricule | nom | classe | niveau | affecte | redoublant | photo
+            Matricule | Nom | Prénom | Classe | Qualité | Statut | ...
           </div>
           <ul className="text-sm text-[#6b7d74] list-disc pl-5 space-y-1.5">
-            <li><b>affecte</b> et <b>redoublant</b> : "Oui" ou "Non"</li>
-            <li><b>photo</b> : nom exact du fichier image dans le zip (ex : 21421986V.jpg), laisser vide si pas de photo</li>
-            <li>Les photos (.jpg, .png, .webp) doivent être à la racine du zip, à côté du fichier Excel</li>
+            <li>Colonne <b>Statut</b> : "Affecte" / "NAffecte" (reconnu automatiquement)</li>
+            <li>Colonne <b>Qualité</b> : "Redoublant" / "NRedoublant" (reconnu automatiquement)</li>
+            <li>Le <b>niveau</b> (6eme, 5eme…) est déduit automatiquement de la classe</li>
+            <li>Toutes les autres colonnes du fichier (moyennes, téléphones, etc.) sont ignorées sans problème</li>
+            <li>Pour ajouter une <b>photo</b> : ajoutez une colonne "photo" avec le nom exact du fichier image (ex : 21421986V.jpg), présent à côté de l'Excel dans le zip. Laissez vide sinon.</li>
             <li>Un élève déjà existant (même matricule) est mis à jour, sinon il est créé</li>
           </ul>
         </Card>
