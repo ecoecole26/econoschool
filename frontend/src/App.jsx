@@ -8,6 +8,7 @@ import TypesDeFrais from './pages/TypesDeFrais.jsx'
 import ImportEleves from './pages/ImportEleves.jsx'
 import Banque from './pages/Banque.jsx'
 import Paiements from './pages/Paiements.jsx'
+import Caisse from './pages/Caisse.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
 
 function RequireAuth({ children }) {
@@ -39,7 +40,7 @@ export default function App() {
       />
       <Route path="/eleves" element={protect(<Eleves />)} />
       <Route path="/paiements" element={protect(<Paiements />)} />
-      <Route path="/caisse" element={protect(<ComingSoon title="Caisse" icon="🗃️" />)} />
+      <Route path="/caisse" element={protect(<Caisse />)} />
       <Route
         path="/depenses"
         element={protect(<ComingSoon title="Dépenses" icon="📤" />)}

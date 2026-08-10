@@ -107,5 +107,15 @@ export const api = {
   configurerBanqueCompte: (payload) =>
     request('/banque-compte', { method: 'PUT', body: JSON.stringify(payload) }),
   ajouterMouvementBanque: (payload) =>
-    request('/banque-compte/mouvements', { method: 'POST', body: JSON.stringify(payload) })
+    request('/banque-compte/mouvements', { method: 'POST', body: JSON.stringify(payload) }),
+
+  getCaisses: () => request('/caisses'),
+  ajouterMouvementCaisse: (payload) =>
+    request('/caisses/mouvements', { method: 'POST', body: JSON.stringify(payload) }),
+  validerMouvementCaisse: (id) => request(`/caisses/mouvements/${id}/valider`, { method: 'POST' }),
+  rejeterMouvementCaisse: (id, commentaire) =>
+    request(`/caisses/mouvements/${id}/rejeter`, {
+      method: 'POST',
+      body: JSON.stringify({ commentaire })
+    })
 }

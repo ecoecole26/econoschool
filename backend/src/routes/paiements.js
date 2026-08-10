@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
+import { crediterCaisse2ParPaiement } from '../lib/caisse.js'
 
 const router = Router()
 
@@ -128,7 +129,22 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Erreur lors de l'enregistrement du paiement" })
   }
 
-  res.json({ paiement: data })
+  // Le paiement est déjà enregistré à ce stade : un souci de crédit caisse ne
+  // doit pas faire échouer la réponse (le paiement reste valide), on log juste
+  // un avertissement pour investigation.
+  let caisseAvertissement = null
+  try {
+    await crediterCaisse2ParPaiement({
+      montant: montantNum,
+      libelle: `Paiement ${eleve.matricule} — ${tranche_libelle || 'frais'}`,
+      etablissement: req.user.etablissement
+    })
+  } catch (errCaisse) {
+    console.error('[paiements] erreur crédit caisse 2:', errCaisse.message)
+    caisseAvertissement = 'Paiement enregistré, mais le crédit de la Caisse 2 a échoué.'
+  }
+
+  res.json({ paiement: data, avertissement: caisseAvertissement })
 })
 
 export default router
