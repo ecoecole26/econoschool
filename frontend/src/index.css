@@ -9,3 +9,23 @@ body {
 h1, h2, h3, h4 {
   @apply font-display;
 }
+
+/* Impression du reçu de paiement : seule la zone #recu-impression est visible */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #recu-impression,
+  #recu-impression * {
+    visibility: visible;
+  }
+  #recu-impression {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
