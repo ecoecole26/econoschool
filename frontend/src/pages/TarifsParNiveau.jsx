@@ -111,9 +111,11 @@ export default function TarifsParNiveau() {
                   </Field>
                 )}
 
-                <div className="mt-3 pt-3 border-t border-[#e3ebe6] flex items-center justify-between">
-                  <span className="text-sm font-semibold text-vert-fonce">Total</span>
-                  <span className="text-base font-display font-bold text-vert-fonce">
+                <div className="mt-4 -mx-5 -mb-5 px-5 py-3.5 bg-teal-light/60 rounded-b-2xl flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-[#3d4f45] uppercase tracking-wide">
+                    Total
+                  </span>
+                  <span className="text-lg font-display font-bold text-vert-fonce">
                     {total.toLocaleString('fr-FR')} FCFA
                   </span>
                 </div>

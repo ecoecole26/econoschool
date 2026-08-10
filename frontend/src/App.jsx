@@ -7,6 +7,7 @@ import TarifsParNiveau from './pages/TarifsParNiveau.jsx'
 import TypesDeFrais from './pages/TypesDeFrais.jsx'
 import ImportEleves from './pages/ImportEleves.jsx'
 import Banque from './pages/Banque.jsx'
+import Paiements from './pages/Paiements.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
 
 function RequireAuth({ children }) {
@@ -37,10 +38,7 @@ export default function App() {
         element={protect(<ComingSoon title="Tableau de bord" icon="📊" />)}
       />
       <Route path="/eleves" element={protect(<Eleves />)} />
-      <Route
-        path="/paiements"
-        element={protect(<ComingSoon title="Paiements" icon="💳" />)}
-      />
+      <Route path="/paiements" element={protect(<Paiements />)} />
       <Route path="/caisse" element={protect(<ComingSoon title="Caisse" icon="🗃️" />)} />
       <Route
         path="/depenses"

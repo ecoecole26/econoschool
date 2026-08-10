@@ -95,5 +95,17 @@ export const api = {
   addTranche: (typeId) => request(`/types-frais/${typeId}/tranches`, { method: 'POST' }),
   deleteTranche: (id) => request(`/types-frais/tranches/${id}`, { method: 'DELETE' }),
   saveTranches: (tranches) =>
-    request('/types-frais/tranches', { method: 'PUT', body: JSON.stringify({ tranches }) })
+    request('/types-frais/tranches', { method: 'PUT', body: JSON.stringify({ tranches }) }),
+
+  rechercherEleveMatricule: (matricule) =>
+    request(`/paiements/recherche?matricule=${encodeURIComponent(matricule)}`),
+  getTranchesPaiement: () => request('/paiements/tranches'),
+  enregistrerPaiement: (payload) =>
+    request('/paiements', { method: 'POST', body: JSON.stringify(payload) }),
+
+  getBanqueCompte: () => request('/banque-compte'),
+  configurerBanqueCompte: (payload) =>
+    request('/banque-compte', { method: 'PUT', body: JSON.stringify(payload) }),
+  ajouterMouvementBanque: (payload) =>
+    request('/banque-compte/mouvements', { method: 'POST', body: JSON.stringify(payload) })
 }

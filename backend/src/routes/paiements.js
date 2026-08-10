@@ -1,0 +1,134 @@
+import { Router } from 'express'
+import { supabase } from '../config/supabase.js'
+import { requireAuth } from '../middleware/requireAuth.js'
+
+const router = Router()
+
+// Calcule le détail des frais dus pour un élève à partir de son niveau + statut.
+// Règle métier : un élève AFFECTÉ ne paie pas la scolarité (prise en charge),
+// elle est déduite du total à payer et son champ reste grisé côté frontend.
+function calculerFrais(tarif, eleve) {
+  const scolarite = Number(tarif?.scolarite_annuelle) || 0
+  const inscription = Number(tarif?.frais_inscription) || 0
+  const annexes = Number(tarif?.frais_annexes) || 0
+  const examen = tarif?.examen ? Number(tarif?.frais_examen) || 0 : 0
+
+  const scolariteApplicable = eleve.affecte ? 0 : scolarite
+  const total_du = scolariteApplicable + inscription + annexes + examen
+
+  return { scolarite, inscription, annexes, examen, scolariteApplicable, total_du }
+}
+
+// GET /api/paiements/recherche?matricule=XXXX
+// Retourne l'élève, le détail des frais dus, l'historique des paiements et le reste à payer.
+router.get('/recherche', requireAuth, async (req, res) => {
+  const matricule = (req.query.matricule || '').trim()
+  if (!matricule) {
+    return res.status(400).json({ error: 'Matricule requis' })
+  }
+
+  const { data: eleve, error: errEleve } = await supabase
+    .from('eleves')
+    .select('*')
+    .ilike('matricule', matricule)
+    .maybeSingle()
+
+  if (errEleve) {
+    console.error('[paiements] erreur recherche élève:', errEleve.message)
+    return res.status(500).json({ error: 'Erreur lors de la recherche' })
+  }
+  if (!eleve) {
+    return res.status(404).json({ error: `Aucun élève avec le matricule "${matricule}"` })
+  }
+
+  const { data: tarif } = await supabase
+    .from('tarifs')
+    .select('*')
+    .eq('niveau', eleve.niveau)
+    .maybeSingle()
+
+  const frais = calculerFrais(tarif || {}, eleve)
+
+  const { data: paiements, error: errPaiements } = await supabase
+    .from('paiements')
+    .select('*')
+    .eq('eleve_id', eleve.id)
+    .order('date_paiement', { ascending: false })
+
+  if (errPaiements) {
+    console.error('[paiements] erreur historique:', errPaiements.message)
+    return res.status(500).json({ error: 'Erreur lors de la lecture des paiements' })
+  }
+
+  const totalPaye = (paiements || []).reduce((s, p) => s + Number(p.montant), 0)
+  const reste_a_payer = Math.max(frais.total_du - totalPaye, 0)
+
+  res.json({ eleve, tarif: tarif || null, frais, paiements: paiements || [], totalPaye, reste_a_payer })
+})
+
+// GET /api/paiements/tranches -> toutes les tranches de toutes les catégories,
+// pour peupler le menu déroulant "Tranche / échéance" du formulaire de paiement.
+router.get('/tranches', requireAuth, async (req, res) => {
+  const { data: types, error: err1 } = await supabase
+    .from('types_frais')
+    .select('id, nom, ordre')
+    .order('ordre', { ascending: true })
+
+  if (err1) return res.status(500).json({ error: err1.message })
+
+  const { data: tranches, error: err2 } = await supabase
+    .from('tranches_frais')
+    .select('*')
+    .order('ordre', { ascending: true })
+
+  if (err2) return res.status(500).json({ error: err2.message })
+
+  const result = tranches.map((t) => {
+    const type = types.find((ty) => ty.id === t.type_frais_id)
+    return { id: t.id, label: `${type?.nom || '—'} — ${t.label}`, date_echeance: t.date_echeance }
+  })
+
+  res.json({ tranches: result })
+})
+
+// POST /api/paiements  { eleve_id, tranche_libelle, montant, date_paiement }
+router.post('/', requireAuth, async (req, res) => {
+  const { eleve_id, tranche_libelle, montant, date_paiement } = req.body || {}
+
+  const montantNum = Number(montant)
+  if (!eleve_id || !montantNum || montantNum <= 0) {
+    return res.status(400).json({ error: 'Élève et montant valides requis' })
+  }
+
+  const { data: eleve, error: errEleve } = await supabase
+    .from('eleves')
+    .select('id, matricule')
+    .eq('id', eleve_id)
+    .maybeSingle()
+
+  if (errEleve || !eleve) {
+    return res.status(404).json({ error: 'Élève introuvable' })
+  }
+
+  const { data, error } = await supabase
+    .from('paiements')
+    .insert({
+      eleve_id,
+      matricule: eleve.matricule,
+      tranche_libelle: tranche_libelle || null,
+      montant: montantNum,
+      date_paiement: date_paiement || new Date().toISOString().slice(0, 10),
+      valide_par: req.user.nom || req.user.role
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('[paiements] erreur enregistrement:', error.message)
+    return res.status(500).json({ error: "Erreur lors de l'enregistrement du paiement" })
+  }
+
+  res.json({ paiement: data })
+})
+
+export default router
