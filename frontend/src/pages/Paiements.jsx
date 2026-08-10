@@ -349,101 +349,126 @@ export default function Paiements() {
         }
       >
         {dernierPaiement && (
-          <div id="recu-impression" className="text-sm text-[#132a1e]">
-            {/* En-tête établissement */}
-            <div className="flex items-center gap-3 pb-3 border-b-2 border-vert-fonce mb-4">
-              {etablissement?.logo_url ? (
-                <img
-                  src={etablissement.logo_url}
-                  alt="Logo"
-                  className="w-14 h-14 rounded-full object-cover border border-[#e3ebe6]"
-                />
-              ) : (
-                <div className="w-14 h-14 rounded-full bg-teal-light flex items-center justify-center text-2xl">
-                  🏫
-                </div>
-              )}
-              <div>
-                <div className="font-display font-bold text-vert-fonce text-base">
-                  {etablissement?.nom || 'Établissement'}
-                </div>
-                <div className="text-xs text-[#6b7d74]">
-                  {[etablissement?.adresse, etablissement?.ville].filter(Boolean).join(', ')}
-                </div>
-                {etablissement?.telephone && (
-                  <div className="text-xs text-[#6b7d74]">Tél : {etablissement.telephone}</div>
-                )}
-              </div>
-            </div>
-
-            <div className="text-center mb-4">
-              <span className="inline-block px-4 py-1 rounded-full bg-teal-light text-teal text-xs font-bold uppercase tracking-wide">
-                Reçu de paiement
-              </span>
-            </div>
-
-            {/* Élève */}
-            <div className="flex items-center gap-3 mb-4 bg-[#f6f8f7] rounded-xl p-3">
-              <div className="w-14 h-14 rounded-full bg-white overflow-hidden flex items-center justify-center text-xl border border-[#e3ebe6]">
-                {dernierPaiement.eleve?.photo_url ? (
-                  <img
-                    src={dernierPaiement.eleve.photo_url}
-                    alt={dernierPaiement.eleve.nom}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  '🧑‍🎓'
-                )}
-              </div>
-              <div>
-                <div className="font-semibold text-vert-fonce">{dernierPaiement.eleve?.nom}</div>
-                <div className="text-xs text-[#6b7d74]">
-                  Matricule : {dernierPaiement.eleve?.matricule} · {dernierPaiement.eleve?.classe || '—'}
-                </div>
-              </div>
-            </div>
-
-            {/* Détail paiement */}
-            <table className="w-full text-sm mb-4">
-              <tbody>
-                <tr className="border-b border-[#f1f5f2]">
-                  <td className="py-1.5 text-[#6b7d74]">Date</td>
-                  <td className="py-1.5 text-right font-medium">
-                    {formatDate(dernierPaiement.date_paiement)}
-                  </td>
-                </tr>
-                <tr className="border-b border-[#f1f5f2]">
-                  <td className="py-1.5 text-[#6b7d74]">Tranche / échéance</td>
-                  <td className="py-1.5 text-right font-medium">
-                    {dernierPaiement.tranche_libelle || '—'}
-                  </td>
-                </tr>
-                <tr className="border-b border-[#f1f5f2]">
-                  <td className="py-1.5 text-[#6b7d74]">Validé par</td>
-                  <td className="py-1.5 text-right font-medium">
-                    {dernierPaiement.valide_par || '—'}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div className="bg-teal-light rounded-xl p-4 text-center mb-4">
-              <div className="text-[11px] font-semibold text-teal uppercase mb-1">
-                Montant versé
-              </div>
-              <div className="text-2xl font-display font-bold text-teal">
-                {formatFCFA(dernierPaiement.montant)}
-              </div>
-            </div>
-
-            <div className="flex justify-between text-xs text-[#9aa8a1] pt-3 border-t border-[#f1f5f2]">
-              <span>Signature / Cachet</span>
-              <span>Édité le {formatDate(new Date())}</span>
-            </div>
-          </div>
+          <RecuContenu
+            dernierPaiement={dernierPaiement}
+            etablissement={etablissement}
+            formatFCFA={formatFCFA}
+            formatDate={formatDate}
+          />
         )}
       </Modal>
+
+      {/* Bloc dédié à l'impression : invisible à l'écran, affiché uniquement sur la feuille imprimée.
+          Il est placé hors de la modale pour ne pas hériter de son positionnement "fixed"/centré,
+          ce qui évitait sinon une grande zone blanche et un débordement sur 2 pages. */}
+      {dernierPaiement && (
+        <div className="hidden print:block">
+          <div id="recu-impression">
+            <RecuContenu
+              dernierPaiement={dernierPaiement}
+              etablissement={etablissement}
+              formatFCFA={formatFCFA}
+              formatDate={formatDate}
+            />
+          </div>
+        </div>
+      )}
     </Layout>
+  )
+}
+
+function RecuContenu({ dernierPaiement, etablissement, formatFCFA, formatDate }) {
+  return (
+    <div className="text-sm text-[#132a1e] p-1">
+      {/* En-tête établissement */}
+      <div className="flex items-center gap-3 pb-3 border-b-2 border-vert-fonce mb-4">
+        {etablissement?.logo_url ? (
+          <img
+            src={etablissement.logo_url}
+            alt="Logo"
+            className="w-14 h-14 rounded-full object-cover border border-[#e3ebe6]"
+          />
+        ) : (
+          <div className="w-14 h-14 rounded-full bg-teal-light flex items-center justify-center text-2xl">
+            🏫
+          </div>
+        )}
+        <div>
+          <div className="font-display font-bold text-vert-fonce text-base">
+            {etablissement?.nom || 'Établissement'}
+          </div>
+          <div className="text-xs text-[#6b7d74]">
+            {[etablissement?.adresse, etablissement?.ville].filter(Boolean).join(', ')}
+          </div>
+          {etablissement?.telephone && (
+            <div className="text-xs text-[#6b7d74]">Tél : {etablissement.telephone}</div>
+          )}
+        </div>
+      </div>
+
+      <div className="text-center mb-4">
+        <span className="inline-block px-4 py-1 rounded-full bg-teal-light text-teal text-xs font-bold uppercase tracking-wide">
+          Reçu de paiement
+        </span>
+      </div>
+
+      {/* Élève */}
+      <div className="flex items-center gap-3 mb-4 bg-[#f6f8f7] rounded-xl p-3">
+        <div className="w-14 h-14 rounded-full bg-white overflow-hidden flex items-center justify-center text-xl border border-[#e3ebe6]">
+          {dernierPaiement.eleve?.photo_url ? (
+            <img
+              src={dernierPaiement.eleve.photo_url}
+              alt={dernierPaiement.eleve.nom}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            '🧑‍🎓'
+          )}
+        </div>
+        <div>
+          <div className="font-semibold text-vert-fonce">{dernierPaiement.eleve?.nom}</div>
+          <div className="text-xs text-[#6b7d74]">
+            Matricule : {dernierPaiement.eleve?.matricule} · {dernierPaiement.eleve?.classe || '—'}
+          </div>
+        </div>
+      </div>
+
+      {/* Détail paiement */}
+      <table className="w-full text-sm mb-4">
+        <tbody>
+          <tr className="border-b border-[#f1f5f2]">
+            <td className="py-1.5 text-[#6b7d74]">Date</td>
+            <td className="py-1.5 text-right font-medium">
+              {formatDate(dernierPaiement.date_paiement)}
+            </td>
+          </tr>
+          <tr className="border-b border-[#f1f5f2]">
+            <td className="py-1.5 text-[#6b7d74]">Tranche / échéance</td>
+            <td className="py-1.5 text-right font-medium">
+              {dernierPaiement.tranche_libelle || '—'}
+            </td>
+          </tr>
+          <tr className="border-b border-[#f1f5f2]">
+            <td className="py-1.5 text-[#6b7d74]">Validé par</td>
+            <td className="py-1.5 text-right font-medium">
+              {dernierPaiement.valide_par || '—'}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div className="bg-teal-light rounded-xl p-4 text-center mb-4">
+        <div className="text-[11px] font-semibold text-teal uppercase mb-1">Montant versé</div>
+        <div className="text-2xl font-display font-bold text-teal">
+          {formatFCFA(dernierPaiement.montant)}
+        </div>
+      </div>
+
+      <div className="flex justify-between text-xs text-[#9aa8a1] pt-3 border-t border-[#f1f5f2]">
+        <span>Signature / Cachet</span>
+        <span>Édité le {formatDate(new Date())}</span>
+      </div>
+    </div>
   )
 }
 
