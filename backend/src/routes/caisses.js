@@ -32,7 +32,7 @@ router.get('/', requireAuth, async (req, res) => {
     .select('*')
     .in('caisse', typesVisibles)
     .order('date', { ascending: false })
-    .order('created_at', { ascending: false })
+   
 
   if (errJournal) {
     console.error('[caisses] erreur lecture journal:', errJournal.message)
