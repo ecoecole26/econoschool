@@ -61,7 +61,7 @@ export default function TarifsParNiveau() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {tarifs.map((t) => {
             const total =
-              (Number(t.scolarite) || 0) +
+              (Number(t.scolarite_annuelle) || 0) +
               (Number(t.frais_inscription) || 0) +
               (Number(t.frais_annexes) || 0) +
               (t.examen ? Number(t.frais_examen) || 0 : 0)
@@ -83,8 +83,8 @@ export default function TarifsParNiveau() {
                 <Field label="Scolarité annuelle (FCFA)">
                   <TextInput
                     type="number"
-                    value={t.scolarite ?? 0}
-                    onChange={setField(t.id, 'scolarite')}
+                    value={t.scolarite_annuelle ?? 0}
+                    onChange={setField(t.id, 'scolarite_annuelle')}
                   />
                 </Field>
                 <Field label="Frais d'inscription (FCFA)">
