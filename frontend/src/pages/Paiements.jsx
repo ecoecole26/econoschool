@@ -109,6 +109,7 @@ export default function Paiements() {
   }
 
   return (
+    <>
     <Layout title="Paiements">
       <div className="mb-6">
         <h2 className="text-2xl font-display font-bold text-vert-fonce flex items-center gap-2.5">
@@ -366,10 +367,12 @@ export default function Paiements() {
           />
         )}
       </Modal>
+    </Layout>
 
       {/* Bloc dédié à l'impression : invisible à l'écran, affiché uniquement sur la feuille imprimée.
-          Il est placé hors de la modale pour ne pas hériter de son positionnement "fixed"/centré,
-          ce qui évitait sinon une grande zone blanche et un débordement sur 2 pages. */}
+          Placé hors de <Layout> (donc hors de #app-shell) pour que le display:none appliqué à
+          #app-shell à l'impression ne le cache pas lui aussi, et pour qu'il ne reste plus aucun
+          espace vide en haut de la page imprimée (sidebar/topbar/contenu de la page). */}
       {dernierPaiement && (
         <div className="hidden print:block">
           <div id="recu-impression">
@@ -382,7 +385,7 @@ export default function Paiements() {
           </div>
         </div>
       )}
-    </Layout>
+    </>
   )
 }
 

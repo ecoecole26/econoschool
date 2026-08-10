@@ -10,17 +10,15 @@ h1, h2, h3, h4 {
   @apply font-display;
 }
 
-/* Impression du reçu de paiement : seule la zone #recu-impression est visible.
-   Elle est rendue en flux normal (voir print:block dans Paiements.jsx), donc pas
-   besoin de la repositionner : ça évite la page blanche/le débordement sur 2 pages
-   qu'on avait quand le reçu était encore imbriqué dans la fenêtre modale (position fixed). */
+/* Impression du reçu de paiement.
+   Important : on cache TOUT l'habillage applicatif (#app-shell = sidebar + topbar + page)
+   avec display:none, et pas juste visibility:hidden. visibility:hidden cache visuellement
+   un élément mais NE LIBÈRE PAS l'espace qu'il occupe : la sidebar/topbar restaient donc
+   "présentes" en hauteur sur la feuille imprimée, ce qui repoussait le reçu plus bas et le
+   faisait déborder sur 2 pages. display:none retire vraiment l'élément du flux. */
 @media print {
-  body * {
-    visibility: hidden;
-  }
-  #recu-impression,
-  #recu-impression * {
-    visibility: visible;
+  #app-shell {
+    display: none !important;
   }
   .no-print {
     display: none !important;

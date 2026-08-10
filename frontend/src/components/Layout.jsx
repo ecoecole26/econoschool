@@ -3,7 +3,7 @@ import Topbar from './Topbar.jsx'
 
 export default function Layout({ title, children }) {
   return (
-    <div className="flex min-h-screen bg-bg">
+    <div id="app-shell" className="flex min-h-screen bg-bg">
       <Sidebar />
       <div className="flex-1 flex flex-col">
         <Topbar title={title} />
