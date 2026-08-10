@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Layout from '../components/Layout.jsx'
 import Modal from '../components/Modal.jsx'
+import IconButton from '../components/IconButton.jsx'
 import { Card, Field, TextInput, Select } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
 
@@ -205,13 +206,21 @@ export default function Paiements() {
               </Field>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 my-4">
+            <div className="grid grid-cols-3 gap-4 my-4">
               <div className="bg-[#f6f8f7] rounded-xl p-4">
                 <div className="text-[11px] font-semibold text-[#9aa8a1] uppercase mb-1">
                   Total à payer
                 </div>
                 <div className="text-xl font-display font-bold text-vert-fonce">
                   {formatFCFA(donnees.frais.total_du)}
+                </div>
+              </div>
+              <div className="bg-teal-light rounded-xl p-4">
+                <div className="text-[11px] font-semibold text-[#9aa8a1] uppercase mb-1">
+                  Total payé
+                </div>
+                <div className="text-xl font-display font-bold text-teal">
+                  {formatFCFA(donnees.totalPaye)}
                 </div>
               </div>
               <div
@@ -279,7 +288,7 @@ export default function Paiements() {
                   disabled={!dernierPaiement}
                   className="px-5 py-2.5 rounded-xl border border-vert-fonce text-vert-fonce text-sm font-semibold disabled:opacity-40 disabled:border-[#d7e8de] disabled:text-[#9aa8a1] flex items-center gap-1.5"
                 >
-                  🧾 Reçu de paiement
+                  🖨️ Reçu de paiement
                 </button>
               </div>
             </div>
@@ -309,13 +318,13 @@ export default function Paiements() {
                         </td>
                         <td className="py-1.5 pr-2">{p.valide_par || '—'}</td>
                         <td className="py-1.5 pr-2 text-right">
-                          <button
+                          <IconButton
+                            variant="teal"
                             onClick={() => ouvrirRecu(p)}
                             title="Imprimer le reçu"
-                            className="text-[#6b7d74] hover:text-vert-fonce"
                           >
-                            🧾
-                          </button>
+                            🖨️
+                          </IconButton>
                         </td>
                       </tr>
                     ))}
