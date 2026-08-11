@@ -12,6 +12,7 @@ import Caisse from './pages/Caisse.jsx'
 import Reductions from './pages/Reductions.jsx'
 import Retards from './pages/Retards.jsx'
 import ProfilEleve from './pages/ProfilEleve.jsx'
+import Rapports from './pages/Rapports.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
 
 function RequireAuth({ children }) {
@@ -49,10 +50,7 @@ export default function App() {
         element={protect(<ComingSoon title="Dépenses" icon="📤" />)}
       />
       <Route path="/reductions" element={protect(<Reductions />)} />
-      <Route
-        path="/rapports"
-        element={protect(<ComingSoon title="Rapports" icon="📈" />)}
-      />
+      <Route path="/rapports" element={protect(<Rapports />)} />
       <Route path="/retards" element={protect(<Retards />)} />
       <Route path="/eleves/:matricule/profil" element={protect(<ProfilEleve />)} />
       <Route
