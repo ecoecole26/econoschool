@@ -9,6 +9,7 @@ import ImportEleves from './pages/ImportEleves.jsx'
 import Banque from './pages/Banque.jsx'
 import Paiements from './pages/Paiements.jsx'
 import Caisse from './pages/Caisse.jsx'
+import Reductions from './pages/Reductions.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
 
 function RequireAuth({ children }) {
@@ -45,10 +46,7 @@ export default function App() {
         path="/depenses"
         element={protect(<ComingSoon title="Dépenses" icon="📤" />)}
       />
-      <Route
-        path="/reductions"
-        element={protect(<ComingSoon title="Réductions" icon="🎁" />)}
-      />
+      <Route path="/reductions" element={protect(<Reductions />)} />
       <Route
         path="/rapports"
         element={protect(<ComingSoon title="Rapports" icon="📈" />)}

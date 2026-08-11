@@ -10,6 +10,7 @@ import typesFraisRoutes from './routes/typesFrais.js'
 import paiementsRoutes from './routes/paiements.js'
 import banqueCompteRoutes from './routes/banqueCompte.js'
 import caissesRoutes from './routes/caisses.js'
+import reductionsRoutes from './routes/reductions.js'
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -30,8 +31,9 @@ app.use('/api/types-frais', typesFraisRoutes)
 app.use('/api/paiements', paiementsRoutes)
 app.use('/api/banque-compte', banqueCompteRoutes)
 app.use('/api/caisses', caissesRoutes)
+app.use('/api/reductions', reductionsRoutes)
 
-// Les prochaines routes (rapports, dépenses, réductions...) viendront ici,
+// Les prochaines routes (rapports, dépenses...) viendront ici,
 // une par une, au fur et à mesure de la reconstruction des pages.
 
 app.listen(PORT, () => {

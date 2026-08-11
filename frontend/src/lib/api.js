@@ -117,5 +117,11 @@ export const api = {
     request(`/caisses/mouvements/${id}/rejeter`, {
       method: 'POST',
       body: JSON.stringify({ commentaire })
-    })
+    }),
+
+  rechercherEleveReduction: (matricule) =>
+    request(`/reductions/recherche?matricule=${encodeURIComponent(matricule)}`),
+  accorderReduction: (payload) =>
+    request('/reductions', { method: 'POST', body: JSON.stringify(payload) }),
+  annulerReduction: (id) => request(`/reductions/${id}/annuler`, { method: 'POST' })
 }

@@ -2,23 +2,9 @@ import { Router } from 'express'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { crediterCaisse2ParPaiement } from '../lib/caisse.js'
+import { calculerFrais, getReductionActive } from '../lib/frais.js'
 
 const router = Router()
-
-// Calcule le détail des frais dus pour un élève à partir de son niveau + statut.
-// Règle métier : un élève AFFECTÉ ne paie pas la scolarité (prise en charge),
-// elle est déduite du total à payer et son champ reste grisé côté frontend.
-function calculerFrais(tarif, eleve) {
-  const scolarite = Number(tarif?.scolarite_annuelle) || 0
-  const inscription = Number(tarif?.frais_inscription) || 0
-  const annexes = Number(tarif?.frais_annexes) || 0
-  const examen = tarif?.examen ? Number(tarif?.frais_examen) || 0 : 0
-
-  const scolariteApplicable = eleve.affecte ? 0 : scolarite
-  const total_du = scolariteApplicable + inscription + annexes + examen
-
-  return { scolarite, inscription, annexes, examen, scolariteApplicable, total_du }
-}
 
 // GET /api/paiements/recherche?matricule=XXXX
 // Retourne l'élève, le détail des frais dus, l'historique des paiements et le reste à payer.
@@ -48,7 +34,14 @@ router.get('/recherche', requireAuth, async (req, res) => {
     .eq('niveau', eleve.niveau)
     .maybeSingle()
 
-  const frais = calculerFrais(tarif || {}, eleve)
+  let reduction = null
+  try {
+    reduction = await getReductionActive(supabase, eleve.id)
+  } catch (errReduction) {
+    console.error('[paiements] erreur lecture réduction:', errReduction.message)
+  }
+
+  const frais = calculerFrais(tarif || {}, eleve, reduction?.pourcentage || 0)
 
   const { data: paiements, error: errPaiements } = await supabase
     .from('paiements')
@@ -64,7 +57,7 @@ router.get('/recherche', requireAuth, async (req, res) => {
   const totalPaye = (paiements || []).reduce((s, p) => s + Number(p.montant), 0)
   const reste_a_payer = Math.max(frais.total_du - totalPaye, 0)
 
-  res.json({ eleve, tarif: tarif || null, frais, paiements: paiements || [], totalPaye, reste_a_payer })
+  res.json({ eleve, tarif: tarif || null, frais, reduction, paiements: paiements || [], totalPaye, reste_a_payer })
 })
 
 // GET /api/paiements/tranches -> toutes les tranches de toutes les catégories,

@@ -352,21 +352,21 @@ function CarteCaisse({ caisse, role, onOperation }) {
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => onOperation('entree')}
-          className="px-3 py-1.5 rounded-lg bg-[#2563eb] text-white text-xs font-semibold"
+          className="px-4 py-1.5 rounded-full bg-vert-fonce text-white text-xs font-semibold"
         >
           + Entrée
         </button>
         {peutSortie && (
           <button
             onClick={() => onOperation('sortie')}
-            className="px-3 py-1.5 rounded-lg bg-danger text-white text-xs font-semibold"
+            className="px-4 py-1.5 rounded-full bg-vert-fonce text-white text-xs font-semibold"
           >
             − Sortie
           </button>
         )}
         <button
           onClick={() => onOperation('reduction')}
-          className="px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 text-xs font-semibold"
+          className="px-4 py-1.5 rounded-full border border-amber-300 text-amber-700 text-xs font-semibold"
         >
           🎁 Réduction
         </button>

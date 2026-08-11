@@ -147,12 +147,12 @@ export default function Paiements() {
           {/* Fiche élève */}
           <Card title="Fiche élève" icon="🧑‍🎓" className="lg:col-span-1">
             <div className="flex flex-col items-center text-center mb-4">
-              <div className="w-24 h-24 rounded-full bg-[#f1f5f2] overflow-hidden mb-3 flex items-center justify-center text-3xl">
+              <div className="w-28 h-28 rounded-full bg-[#f1f5f2] overflow-hidden mb-3 flex items-center justify-center text-3xl">
                 {donnees.eleve.photo_url ? (
                   <img
                     src={donnees.eleve.photo_url}
                     alt={donnees.eleve.nom}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover object-top"
                   />
                 ) : (
                   '🧑‍🎓'
@@ -192,9 +192,32 @@ export default function Paiements() {
               </div>
             )}
 
+            {donnees.reduction && (
+              <div className="mb-4 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                <div className="text-sm text-amber-800">
+                  🎁 Réduction active : <strong>{donnees.reduction.pourcentage}%</strong> sur la
+                  scolarité
+                  {donnees.reduction.motif ? ` — ${donnees.reduction.motif}` : ''}
+                </div>
+                <div className="text-xs text-amber-700 mt-0.5">
+                  Accordée par {donnees.reduction.accordee_par} · gérée sur la page Réductions
+                  (Fondateur)
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-x-6">
               <Field label="Scolarité (FCFA)">
-                <TextInput value={donnees.frais.scolarite} disabled={donnees.eleve.affecte} readOnly />
+                <TextInput
+                  value={donnees.frais.scolariteApplicable}
+                  disabled={donnees.eleve.affecte}
+                  readOnly
+                />
+                {donnees.reduction && !donnees.eleve.affecte && (
+                  <div className="text-xs text-[#9aa8a1] mt-1">
+                    Plein tarif : <span className="line-through">{formatFCFA(donnees.frais.scolarite)}</span>
+                  </div>
+                )}
               </Field>
               <Field label="Frais d'inscription (FCFA)">
                 <TextInput value={donnees.frais.inscription} readOnly />
@@ -431,7 +454,7 @@ function RecuContenu({ dernierPaiement, etablissement, formatFCFA, formatDate })
             <img
               src={dernierPaiement.eleve.photo_url}
               alt={dernierPaiement.eleve.nom}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover object-top"
             />
           ) : (
             '🧑‍🎓'
