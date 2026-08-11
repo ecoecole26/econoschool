@@ -120,17 +120,47 @@ export async function enregistrerMouvementCaisse({
   return { mouvement, caisse: caisseMaj }
 }
 
-// Crédite automatiquement la Caisse 2 (secondaire) lors d'un paiement élève.
-// Ne lève pas d'exception qui bloquerait le paiement déjà enregistré ;
-// l'appelant décide quoi faire en cas d'échec (log, avertissement...).
-export async function crediterCaisse2ParPaiement({ montant, libelle, etablissement, annee_scolaire }) {
-  return enregistrerMouvementCaisse({
-    type_caisse: 'secondaire',
-    type_operation: TYPE_ENCAISSEMENT,
-    montant,
-    libelle,
-    etablissement,
-    annee_scolaire,
-    nom: 'Système (paiement)'
-  })
+// Crédite automatiquement LES DEUX caisses (principale ET secondaire) lors
+// d'un paiement élève, chacune du même montant. C'est le comportement
+// attendu : Caisse 1 (réservée au Fondateur) et Caisse 2 (opérations
+// courantes) reflètent toutes les deux l'intégralité des encaissements —
+// seule la Sortie reste différenciée par rôle (cf. roleAAccesOperation).
+//
+// Les deux crédits sont indépendants : si l'un échoue, on tente quand même
+// l'autre, pour éviter qu'une des deux caisses ne prenne du retard sur
+// l'autre à cause d'une erreur isolée. Retourne { principale, secondaire },
+// chaque entrée étant soit le résultat de enregistrerMouvementCaisse, soit
+// une erreur si le crédit correspondant a échoué.
+export async function crediterCaissesParPaiement({ montant, libelle, etablissement, annee_scolaire }) {
+  const resultat = { principale: null, secondaire: null }
+
+  try {
+    resultat.principale = await enregistrerMouvementCaisse({
+      type_caisse: 'principale',
+      type_operation: TYPE_ENCAISSEMENT,
+      montant,
+      libelle,
+      etablissement,
+      annee_scolaire,
+      nom: 'Système (paiement)'
+    })
+  } catch (errPrincipale) {
+    resultat.principale = { error: errPrincipale.message }
+  }
+
+  try {
+    resultat.secondaire = await enregistrerMouvementCaisse({
+      type_caisse: 'secondaire',
+      type_operation: TYPE_ENCAISSEMENT,
+      montant,
+      libelle,
+      etablissement,
+      annee_scolaire,
+      nom: 'Système (paiement)'
+    })
+  } catch (errSecondaire) {
+    resultat.secondaire = { error: errSecondaire.message }
+  }
+
+  return resultat
 }

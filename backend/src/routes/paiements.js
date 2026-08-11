@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
-import { crediterCaisse2ParPaiement } from '../lib/caisse.js'
+import { crediterCaissesParPaiement } from '../lib/caisse.js'
 import { calculerFrais, getReductionActive } from '../lib/frais.js'
 
 const router = Router()
@@ -124,17 +124,32 @@ router.post('/', requireAuth, async (req, res) => {
 
   // Le paiement est déjà enregistré à ce stade : un souci de crédit caisse ne
   // doit pas faire échouer la réponse (le paiement reste valide), on log juste
-  // un avertissement pour investigation.
+  // un avertissement pour investigation. Les DEUX caisses (1 et 2) doivent
+  // recevoir le même montant.
   let caisseAvertissement = null
   try {
-    await crediterCaisse2ParPaiement({
+    const { principale, secondaire } = await crediterCaissesParPaiement({
       montant: montantNum,
       libelle: `Paiement ${eleve.matricule} — ${tranche_libelle || 'frais'}`,
       etablissement: req.user.etablissement
     })
+
+    const echecPrincipale = !principale || principale.error
+    const echecSecondaire = !secondaire || secondaire.error
+
+    if (echecPrincipale && echecSecondaire) {
+      console.error('[paiements] erreur crédit caisses 1 et 2:', principale?.error, secondaire?.error)
+      caisseAvertissement = 'Paiement enregistré, mais le crédit des Caisses 1 et 2 a échoué.'
+    } else if (echecPrincipale) {
+      console.error('[paiements] erreur crédit caisse 1:', principale?.error)
+      caisseAvertissement = 'Paiement enregistré, mais le crédit de la Caisse 1 a échoué.'
+    } else if (echecSecondaire) {
+      console.error('[paiements] erreur crédit caisse 2:', secondaire?.error)
+      caisseAvertissement = 'Paiement enregistré, mais le crédit de la Caisse 2 a échoué.'
+    }
   } catch (errCaisse) {
-    console.error('[paiements] erreur crédit caisse 2:', errCaisse.message)
-    caisseAvertissement = 'Paiement enregistré, mais le crédit de la Caisse 2 a échoué.'
+    console.error('[paiements] erreur crédit caisses:', errCaisse.message)
+    caisseAvertissement = 'Paiement enregistré, mais le crédit des caisses a échoué.'
   }
 
   res.json({ paiement: data, avertissement: caisseAvertissement })
