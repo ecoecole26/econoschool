@@ -193,9 +193,13 @@ export default function Eleves() {
                   className="text-center cursor-pointer group"
                   onClick={() => setSelected(el)}
                 >
-                  <div className="w-full aspect-square rounded-xl overflow-hidden bg-[#eef6f1] border border-[#e3ebe6] mb-1.5">
+                  <div className="w-full aspect-[3/4] rounded-xl overflow-hidden bg-[#eef6f1] border border-[#e3ebe6] mb-1.5">
                     {el.photo_url ? (
-                      <img src={el.photo_url} alt={el.nom} className="w-full h-full object-cover" />
+                      <img
+                        src={el.photo_url}
+                        alt={el.nom}
+                        className="w-full h-full object-cover object-top"
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-2xl text-[#a9bcb2]">
                         🧑‍🎓
@@ -291,7 +295,7 @@ export default function Eleves() {
               <img
                 src={selected.photo_url}
                 alt={selected.nom}
-                className="w-24 h-24 rounded-xl object-cover mb-3 border border-[#e3ebe6]"
+                className="w-28 h-36 rounded-xl object-cover object-top mb-3 mx-auto border border-[#e3ebe6]"
               />
             )}
             <Row label="Matricule" value={selected.matricule} />
