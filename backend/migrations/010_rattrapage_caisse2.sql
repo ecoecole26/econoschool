@@ -13,7 +13,7 @@ begin
   -- Garde-fou : si ce rattrapage a déjà été fait, on ne recrédite pas deux fois.
   select exists (
     select 1 from public.journal_caisse
-    where type_operation = 'paiement_auto'
+    where type_operation = 'Encaissement'
       and libelle = 'Rattrapage : paiements enregistrés avant la mise en place de la Caisse'
   ) into deja_fait;
 
@@ -49,7 +49,7 @@ begin
   insert into public.journal_caisse
     (caisse, type_operation, montant, libelle, date, statut, demande_par, valide_par)
   values
-    ('secondaire', 'paiement_auto', total_historique,
+    ('secondaire', 'Encaissement', total_historique,
      'Rattrapage : paiements enregistrés avant la mise en place de la Caisse',
      current_date, 'validee', 'Système (rattrapage)', 'Système (rattrapage)');
 

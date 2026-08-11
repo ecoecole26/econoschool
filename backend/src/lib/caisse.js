@@ -3,10 +3,17 @@ import { supabase } from '../config/supabase.js'
 // Deux caisses fixes dans l'app :
 // - principale : réservée au Fondateur (accès total, lui seul)
 // - secondaire : utilisée au quotidien par l'Économe et le Proviseur.
-//   Toutes les opérations y sont libres, SAUF le type "reduction" qui reste
-//   en attente de validation du Fondateur quand elle est saisie par
-//   l'Économe ou le Proviseur.
+//
+// NB : les valeurs 'principale'/'secondaire' (colonne type_caisse) et
+// 'Encaissement'/'Sortie' (colonne type_operation de journal_caisse) sont
+// imposées par des contraintes SQL héritées de l'ancien projet EconoSchool
+// Pro — impossible d'utiliser d'autres libellés sans modifier la contrainte
+// en base. Les réductions sont gérées à part (page Réductions, table
+// `reductions`), plus comme un mouvement de caisse.
 export const TYPES_CAISSE = ['principale', 'secondaire']
+
+export const TYPE_ENCAISSEMENT = 'Encaissement'
+export const TYPE_SORTIE = 'Sortie'
 
 // Rôles pouvant voir/opérer chaque caisse.
 const ACCES_CAISSE = {
@@ -22,16 +29,10 @@ export function roleAAccesCaisse(role, type_caisse) {
   return (ACCES_CAISSE[type_caisse] || []).includes(role)
 }
 
-// Une "reduction" saisie par quelqu'un d'autre que le Fondateur doit être
-// validée avant d'impacter le solde.
-export function operationRequiertValidation(type_operation, role) {
-  return type_operation === 'reduction' && role !== 'fondateur'
-}
-
 // Les sorties/retraits/dépenses sont réservés au Fondateur — l'Économe et le
-// Proviseur ne peuvent ni les exécuter, ni les proposer.
+// Proviseur ne peuvent pas les exécuter.
 export function roleAAccesOperation(role, type_operation) {
-  if (type_operation === 'sortie') return role === 'fondateur'
+  if (type_operation === TYPE_SORTIE) return role === 'fondateur'
   return true
 }
 
@@ -62,14 +63,13 @@ export async function getOrCreateCaisse(type_caisse, etablissement) {
   return creee
 }
 
-// Applique un mouvement déjà validé au solde de la caisse : entree/paiement_auto
-// créditent, sortie/reduction débitent.
 function impactSolde(type_operation, montant) {
-  return ['sortie', 'reduction'].includes(type_operation) ? -montant : montant
+  return type_operation === TYPE_SORTIE ? -montant : montant
 }
 
-// Insère un mouvement dans le journal et, s'il est validé immédiatement,
-// met à jour le solde de la caisse. Retourne { mouvement, caisse }.
+// Insère un mouvement dans le journal et met à jour le solde de la caisse
+// (toujours immédiat : plus de workflow d'attente au niveau de la caisse,
+// les réductions étant désormais gérées à part). Retourne { mouvement, caisse }.
 export async function enregistrerMouvementCaisse({
   type_caisse,
   type_operation,
@@ -78,14 +78,12 @@ export async function enregistrerMouvementCaisse({
   date,
   etablissement,
   annee_scolaire,
-  role,
   nom
 }) {
   const caisse = await getOrCreateCaisse(type_caisse, etablissement)
   const montantNum = Number(montant)
-  const enAttente = operationRequiertValidation(type_operation, role)
 
-  if (!enAttente && type_operation === 'sortie' && montantNum > caisse.solde) {
+  if (type_operation === TYPE_SORTIE && montantNum > caisse.solde) {
     throw new Error('Solde insuffisant dans cette caisse pour cette sortie')
   }
 
@@ -99,18 +97,14 @@ export async function enregistrerMouvementCaisse({
       libelle: libelle || null,
       date: date || new Date().toISOString().slice(0, 10),
       annee_scolaire: annee_scolaire || null,
-      statut: enAttente ? 'en_attente' : 'validee',
-      demande_par: nom || role,
-      valide_par: enAttente ? null : nom || role
+      statut: 'validee',
+      demande_par: nom || null,
+      valide_par: nom || null
     })
     .select()
     .single()
 
   if (errJournal) throw new Error(errJournal.message)
-
-  if (enAttente) {
-    return { mouvement, caisse }
-  }
 
   const nouveauSolde = caisse.solde + impactSolde(type_operation, montantNum)
 
@@ -126,18 +120,17 @@ export async function enregistrerMouvementCaisse({
   return { mouvement, caisse: caisseMaj }
 }
 
-// Crédite automatiquement la Caisse 2 lors d'un paiement élève.
+// Crédite automatiquement la Caisse 2 (secondaire) lors d'un paiement élève.
 // Ne lève pas d'exception qui bloquerait le paiement déjà enregistré ;
 // l'appelant décide quoi faire en cas d'échec (log, avertissement...).
 export async function crediterCaisse2ParPaiement({ montant, libelle, etablissement, annee_scolaire }) {
   return enregistrerMouvementCaisse({
     type_caisse: 'secondaire',
-    type_operation: 'paiement_auto',
+    type_operation: TYPE_ENCAISSEMENT,
     montant,
     libelle,
     etablissement,
     annee_scolaire,
-    role: 'fondateur', // opération système, jamais en attente
     nom: 'Système (paiement)'
   })
 }

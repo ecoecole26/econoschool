@@ -112,12 +112,6 @@ export const api = {
   getCaisses: () => request('/caisses'),
   ajouterMouvementCaisse: (payload) =>
     request('/caisses/mouvements', { method: 'POST', body: JSON.stringify(payload) }),
-  validerMouvementCaisse: (id) => request(`/caisses/mouvements/${id}/valider`, { method: 'POST' }),
-  rejeterMouvementCaisse: (id, commentaire) =>
-    request(`/caisses/mouvements/${id}/rejeter`, {
-      method: 'POST',
-      body: JSON.stringify({ commentaire })
-    }),
 
   rechercherEleveReduction: (matricule) =>
     request(`/reductions/recherche?matricule=${encodeURIComponent(matricule)}`),
