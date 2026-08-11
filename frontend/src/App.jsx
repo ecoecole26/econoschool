@@ -13,6 +13,9 @@ import Reductions from './pages/Reductions.jsx'
 import Retards from './pages/Retards.jsx'
 import ProfilEleve from './pages/ProfilEleve.jsx'
 import TableauDeBord from './pages/TableauDeBord.jsx'
+import Rapports from './pages/Rapports.jsx'
+import BilanPeriodique from './pages/BilanPeriodique.jsx'
+import DateButoir from './pages/DateButoir.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
 
 function RequireAuth({ children }) {
@@ -47,20 +50,11 @@ export default function App() {
         element={protect(<ComingSoon title="Dépenses" icon="📤" />)}
       />
       <Route path="/reductions" element={protect(<Reductions />)} />
-      <Route
-        path="/rapports"
-        element={protect(<ComingSoon title="Rapports" icon="📈" />)}
-      />
+      <Route path="/rapports" element={protect(<Rapports />)} />
       <Route path="/retards" element={protect(<Retards />)} />
       <Route path="/eleves/:matricule/profil" element={protect(<ProfilEleve />)} />
-      <Route
-        path="/bilan"
-        element={protect(<ComingSoon title="Bilan périodique" icon="📋" />)}
-      />
-      <Route
-        path="/butoir"
-        element={protect(<ComingSoon title="Date butoir" icon="📅" />)}
-      />
+      <Route path="/bilan" element={protect(<BilanPeriodique />)} />
+      <Route path="/butoir" element={protect(<DateButoir />)} />
     </Routes>
   )
 }

@@ -11,6 +11,8 @@ import paiementsRoutes from './routes/paiements.js'
 import banqueCompteRoutes from './routes/banqueCompte.js'
 import caissesRoutes from './routes/caisses.js'
 import reductionsRoutes from './routes/reductions.js'
+import datesButoirRoutes from './routes/datesButoir.js'
+import bilanPeriodiqueRoutes from './routes/bilanPeriodique.js'
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -32,6 +34,8 @@ app.use('/api/paiements', paiementsRoutes)
 app.use('/api/banque-compte', banqueCompteRoutes)
 app.use('/api/caisses', caissesRoutes)
 app.use('/api/reductions', reductionsRoutes)
+app.use('/api/dates-butoir', datesButoirRoutes)
+app.use('/api/bilan-periodique', bilanPeriodiqueRoutes)
 
 // Les prochaines routes (rapports, dépenses...) viendront ici,
 // une par une, au fur et à mesure de la reconstruction des pages.

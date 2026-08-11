@@ -83,6 +83,13 @@ router.get('/', requireAuth, async (req, res) => {
 // Calcule le bilan (total dû/payé/reste + statut) pour chaque élève
 // correspondant aux filtres donnés. Partagé par GET /bilan (JSON, pour la
 // page Retards) et GET /bilan/export (fichier Excel).
+// Renvoie la date butoir applicable à un niveau donné : celle spécifique au
+// niveau si elle existe, sinon la date globale, sinon null (pas de notion de
+// date — on retombe alors sur l'ancien comportement "non soldé = en retard").
+function dateButoirPourNiveau(niveau, { global, parNiveau }) {
+  return (niveau && parNiveau[niveau]) || global || null
+}
+
 async function calculerBilanEleves({ search = '', classe = '', niveau = '', statutPaiementFiltre = '' }) {
   const eleves = await fetchTout((from, to) => {
     let q = supabase.from('eleves').select('*').order('nom', { ascending: true })
@@ -92,12 +99,13 @@ async function calculerBilanEleves({ search = '', classe = '', niveau = '', stat
     return q.range(from, to)
   })
 
-  const [tarifs, reductions, paiements] = await Promise.all([
+  const [tarifs, reductions, paiements, datesButoirBrutes] = await Promise.all([
     fetchTout((from, to) => supabase.from('tarifs').select('*').range(from, to)),
     fetchTout((from, to) =>
       supabase.from('reductions').select('eleve_id, pourcentage').eq('statut', 'active').range(from, to)
     ),
-    fetchTout((from, to) => supabase.from('paiements').select('eleve_id, montant').range(from, to))
+    fetchTout((from, to) => supabase.from('paiements').select('eleve_id, montant').range(from, to)),
+    fetchTout((from, to) => supabase.from('dates_butoir').select('niveau, date_butoir').range(from, to))
   ])
 
   const tarifParNiveau = new Map((tarifs || []).map((t) => [t.niveau, t]))
@@ -107,6 +115,13 @@ async function calculerBilanEleves({ search = '', classe = '', niveau = '', stat
     totalPayeParEleve.set(p.eleve_id, (totalPayeParEleve.get(p.eleve_id) || 0) + Number(p.montant))
   }
 
+  const datesButoir = { global: null, parNiveau: {} }
+  for (const d of datesButoirBrutes || []) {
+    if (d.niveau) datesButoir.parNiveau[d.niveau] = d.date_butoir
+    else datesButoir.global = d.date_butoir
+  }
+  const aujourdhui = new Date().toISOString().slice(0, 10)
+
   let lignes = (eleves || []).map((eleve) => {
     const tarif = tarifParNiveau.get(eleve.niveau) || {}
     const reductionPourcentage = reductionParEleve.get(eleve.id) || 0
@@ -115,6 +130,14 @@ async function calculerBilanEleves({ search = '', classe = '', niveau = '', stat
     const reste_a_payer = Math.max(frais.total_du - totalPaye, 0)
     const statut_paiement =
       reste_a_payer <= 0 ? 'solde' : totalPaye > 0 ? 'partiel' : 'non_paye'
+
+    const date_butoir = dateButoirPourNiveau(eleve.niveau, datesButoir)
+    // Si une date butoir s'applique (niveau ou globale) : en retard = pas
+    // soldé ET date butoir dépassée. Sinon (aucune date configurée) : on
+    // garde l'ancien comportement, en retard = simplement pas soldé.
+    const en_retard = date_butoir
+      ? reste_a_payer > 0 && aujourdhui > date_butoir
+      : reste_a_payer > 0
 
     return {
       id: eleve.id,
@@ -128,14 +151,16 @@ async function calculerBilanEleves({ search = '', classe = '', niveau = '', stat
       total_du: frais.total_du,
       total_paye: totalPaye,
       reste_a_payer,
-      statut_paiement
+      statut_paiement,
+      date_butoir,
+      en_retard
     }
   })
 
   if (statutPaiementFiltre === 'solde') {
     lignes = lignes.filter((l) => l.statut_paiement === 'solde')
   } else if (statutPaiementFiltre === 'retard') {
-    lignes = lignes.filter((l) => l.statut_paiement !== 'solde')
+    lignes = lignes.filter((l) => l.en_retard)
   }
 
   const resume = {
@@ -143,7 +168,7 @@ async function calculerBilanEleves({ search = '', classe = '', niveau = '', stat
     total_actifs: lignes.filter((l) => (l.statut || '').toLowerCase() === 'actif').length,
     affectes: lignes.filter((l) => l.affecte).length,
     solde: lignes.filter((l) => l.statut_paiement === 'solde').length,
-    en_retard: lignes.filter((l) => l.statut_paiement !== 'solde').length,
+    en_retard: lignes.filter((l) => l.en_retard).length,
     total_du: lignes.reduce((s, l) => s + l.total_du, 0),
     total_paye: lignes.reduce((s, l) => s + l.total_paye, 0),
     total_reste: lignes.reduce((s, l) => s + l.reste_a_payer, 0)

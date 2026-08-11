@@ -136,6 +136,18 @@ export const api = {
   ajouterMouvementCaisse: (payload) =>
     request('/caisses/mouvements', { method: 'POST', body: JSON.stringify(payload) }),
 
+  getDatesButoir: () => request('/dates-butoir'),
+  saveDateButoirGlobale: (date_butoir) =>
+    request('/dates-butoir/globale', { method: 'PUT', body: JSON.stringify({ date_butoir }) }),
+  saveDateButoirNiveau: (niveau, date_butoir) =>
+    request(`/dates-butoir/niveau/${encodeURIComponent(niveau)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ date_butoir })
+    }),
+
+  getBilanPeriodique: (debut, fin) =>
+    request(`/bilan-periodique?debut=${encodeURIComponent(debut)}&fin=${encodeURIComponent(fin)}`),
+
   rechercherEleveReduction: (matricule) =>
     request(`/reductions/recherche?matricule=${encodeURIComponent(matricule)}`),
   accorderReduction: (payload) =>
