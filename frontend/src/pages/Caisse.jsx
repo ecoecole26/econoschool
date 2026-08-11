@@ -8,7 +8,7 @@ function formatFCFA(n) {
   return `${Math.round(n || 0).toLocaleString('fr-FR')} F`
 }
 
-const LABEL_CAISSE = { caisse_1: 'Caisse 1', caisse_2: 'Caisse 2' }
+const LABEL_CAISSE = { principale: 'Caisse 1', secondaire: 'Caisse 2' }
 const LABEL_OPERATION = { entree: 'Entrée', sortie: 'Sortie', reduction: 'Réduction', paiement_auto: 'Paiement (auto)' }
 const COULEUR_OPERATION = {
   entree: 'bg-[#dbeafe] text-[#2563eb]',
@@ -359,7 +359,7 @@ function CarteCaisse({ caisse, role, onOperation }) {
         {peutSortie && (
           <button
             onClick={() => onOperation('sortie')}
-            className="px-4 py-1.5 rounded-full bg-vert-fonce text-white text-xs font-semibold"
+            className="px-4 py-1.5 rounded-full bg-orange text-white text-xs font-semibold"
           >
             − Sortie
           </button>

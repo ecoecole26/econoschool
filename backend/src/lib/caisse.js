@@ -1,17 +1,17 @@
 import { supabase } from '../config/supabase.js'
 
 // Deux caisses fixes dans l'app :
-// - caisse_1 : réservée au Fondateur (accès total, lui seul)
-// - caisse_2 : utilisée au quotidien par l'Économe et le Proviseur.
+// - principale : réservée au Fondateur (accès total, lui seul)
+// - secondaire : utilisée au quotidien par l'Économe et le Proviseur.
 //   Toutes les opérations y sont libres, SAUF le type "reduction" qui reste
 //   en attente de validation du Fondateur quand elle est saisie par
 //   l'Économe ou le Proviseur.
-export const TYPES_CAISSE = ['caisse_1', 'caisse_2']
+export const TYPES_CAISSE = ['principale', 'secondaire']
 
 // Rôles pouvant voir/opérer chaque caisse.
 const ACCES_CAISSE = {
-  caisse_1: ['fondateur'],
-  caisse_2: ['fondateur', 'proviseur', 'econome']
+  principale: ['fondateur'],
+  secondaire: ['fondateur', 'proviseur', 'econome']
 }
 
 export function caissesVisiblesPourRole(role) {
@@ -52,7 +52,7 @@ export async function getOrCreateCaisse(type_caisse, etablissement) {
     .insert({
       type_caisse,
       etablissement: etablissement || null,
-      statut: 'active',
+      statut: 'ouverte',
       solde: 0
     })
     .select()
@@ -131,7 +131,7 @@ export async function enregistrerMouvementCaisse({
 // l'appelant décide quoi faire en cas d'échec (log, avertissement...).
 export async function crediterCaisse2ParPaiement({ montant, libelle, etablissement, annee_scolaire }) {
   return enregistrerMouvementCaisse({
-    type_caisse: 'caisse_2',
+    type_caisse: 'secondaire',
     type_operation: 'paiement_auto',
     montant,
     libelle,
