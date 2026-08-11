@@ -144,7 +144,7 @@ export default function Reductions() {
           {/* Fiche élève */}
           <Card title="Fiche élève" icon="🧑‍🎓" className="lg:col-span-1">
             <div className="flex flex-col items-center text-center mb-4">
-              <div className="w-28 h-28 rounded-full bg-[#f1f5f2] overflow-hidden mb-3 flex items-center justify-center text-3xl">
+              <div className="w-40 h-40 rounded-full bg-[#f1f5f2] overflow-hidden mb-3 flex items-center justify-center text-4xl">
                 {donnees.eleve.photo_url ? (
                   <img
                     src={donnees.eleve.photo_url}
