@@ -24,10 +24,15 @@ function protect(el) {
   return <RequireAuth>{el}</RequireAuth>
 }
 
+function RedirectIfAuth({ children }) {
+  const token = localStorage.getItem('econoschool_token')
+  return token ? <Navigate to="/tableau-de-bord" replace /> : children
+}
+
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Login />} />
+      <Route path="/" element={<RedirectIfAuth><Login /></RedirectIfAuth>} />
 
       {/* Paramétrages */}
       <Route path="/parametres" element={protect(<ParametresEtablissement />)} />

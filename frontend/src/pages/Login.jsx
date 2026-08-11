@@ -26,7 +26,7 @@ export default function Login() {
       const { token } = await api.login(role, password)
       localStorage.setItem('econoschool_token', token)
       localStorage.setItem('econoschool_role', role)
-      navigate('/eleves')
+      navigate('/tableau-de-bord')
     } catch (err) {
       setError(err.message || 'Mot de passe incorrect')
     } finally {
