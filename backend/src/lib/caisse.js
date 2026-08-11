@@ -95,7 +95,11 @@ export async function enregistrerMouvementCaisse({
       type_operation,
       montant: montantNum,
       libelle: libelle || null,
-      date: date || new Date().toISOString().slice(0, 10),
+      // Horodatage complet (date + heure), pas seulement la date : la
+      // Côte d'Ivoire étant en GMT/UTC+0 toute l'année (pas d'heure d'été),
+      // l'heure UTC correspond directement à l'heure locale, sans décalage
+      // à appliquer.
+      date: date || new Date().toISOString(),
       annee_scolaire: annee_scolaire || null,
       statut: 'validee',
       demande_par: nom || null,

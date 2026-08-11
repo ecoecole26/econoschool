@@ -8,6 +8,26 @@ function formatFCFA(n) {
   return `${Math.round(n || 0).toLocaleString('fr-FR')} F`
 }
 
+// Affiche la date/heure du mouvement en clair (ex. "11/08/2026 à 13:32").
+// Reste robuste si l'ancienne valeur (date seule, sans heure) est encore
+// présente pour des mouvements enregistrés avant ce correctif.
+function formatDateHeure(valeur) {
+  if (!valeur) return '—'
+  const d = new Date(valeur)
+  if (Number.isNaN(d.getTime())) return valeur
+  const datePart = d.toLocaleDateString('fr-FR', { timeZone: 'UTC' })
+  const heurePart = d.toLocaleTimeString('fr-FR', {
+    timeZone: 'UTC',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+  // Les anciens mouvements sans heure tombent tous à 00:00 : on masque
+  // l'heure dans ce cas précis pour ne pas laisser croire qu'ils datent
+  // tous de minuit.
+  if (heurePart === '00:00') return datePart
+  return `${datePart} à ${heurePart}`
+}
+
 const LABEL_CAISSE = { principale: 'Caisse 1', secondaire: 'Caisse 2' }
 const COULEUR_OPERATION = {
   Encaissement: 'bg-teal-light text-teal',
@@ -125,7 +145,7 @@ export default function Caisse() {
               <tbody>
                 {journal.map((m) => (
                   <tr key={m.id} className="border-b border-[#f1f5f2]">
-                    <td className="py-2 pr-2 truncate">{m.date}</td>
+                    <td className="py-2 pr-2 truncate">{formatDateHeure(m.date)}</td>
                     <td className="py-2 pr-2 truncate">{LABEL_CAISSE[m.caisse] || m.caisse}</td>
                     <td className="py-2 pr-2">
                       <span
