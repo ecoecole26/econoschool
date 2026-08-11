@@ -9,6 +9,8 @@ export default {
         'vert-clair': '#1a8551',
         orange: '#e8871e',
         'orange-clair': '#f5a742',
+        bleu: '#2563eb',
+        'bleu-clair': '#3b82f6',
         bg: '#eef6f1',
         // Système de design repris de l'app existante (sidebar sombre, cartes claires)
         sidebar: '#12181f',
