@@ -63,19 +63,10 @@ router.get('/', requireAuth, async (req, res) => {
   res.json({ eleves: data, total: count })
 })
 
-// GET /api/eleves/bilan?search=...&classe=...&niveau=...&statut_paiement=solde|retard
-// Pour CHAQUE élève (filtré éventuellement) : total dû, total payé, reste à
-// payer et statut ("solde" / "partiel" / "non_paye"), calculés avec la même
-// logique que la fiche élève de la page Paiements (calculerFrais + réduction
-// active + somme des paiements). Sert la page "Retards".
-router.get('/bilan', requireAuth, async (req, res) => {
-  const {
-    search = '',
-    classe = '',
-    niveau = '',
-    statut_paiement: statutPaiementFiltre = ''
-  } = req.query
-
+// Calcule le bilan (total dû/payé/reste + statut) pour chaque élève
+// correspondant aux filtres donnés. Partagé par GET /bilan (JSON, pour la
+// page Retards) et GET /bilan/export (fichier Excel).
+async function calculerBilanEleves({ search = '', classe = '', niveau = '', statutPaiementFiltre = '' }) {
   let queryEleves = supabase.from('eleves').select('*').order('nom', { ascending: true })
   if (search) {
     queryEleves = queryEleves.or(`nom.ilike.%${search}%,matricule.ilike.%${search}%`)
@@ -84,10 +75,7 @@ router.get('/bilan', requireAuth, async (req, res) => {
   if (niveau) queryEleves = queryEleves.eq('niveau', niveau)
 
   const { data: eleves, error: errEleves } = await queryEleves
-  if (errEleves) {
-    console.error('[eleves] erreur bilan (élèves):', errEleves.message)
-    return res.status(500).json({ error: 'Erreur lors de la lecture des élèves' })
-  }
+  if (errEleves) throw new Error(errEleves.message)
 
   const [{ data: tarifs, error: errTarifs }, { data: reductions, error: errReductions }, { data: paiements, error: errPaiements }] =
     await Promise.all([
@@ -96,9 +84,9 @@ router.get('/bilan', requireAuth, async (req, res) => {
       supabase.from('paiements').select('eleve_id, montant')
     ])
 
-  if (errTarifs) return res.status(500).json({ error: errTarifs.message })
-  if (errReductions) return res.status(500).json({ error: errReductions.message })
-  if (errPaiements) return res.status(500).json({ error: errPaiements.message })
+  if (errTarifs) throw new Error(errTarifs.message)
+  if (errReductions) throw new Error(errReductions.message)
+  if (errPaiements) throw new Error(errPaiements.message)
 
   const tarifParNiveau = new Map((tarifs || []).map((t) => [t.niveau, t]))
   const reductionParEleve = new Map((reductions || []).map((r) => [r.eleve_id, r.pourcentage]))
@@ -146,7 +134,76 @@ router.get('/bilan', requireAuth, async (req, res) => {
     total_reste: lignes.reduce((s, l) => s + l.reste_a_payer, 0)
   }
 
-  res.json({ lignes, resume })
+  return { lignes, resume }
+}
+
+// GET /api/eleves/bilan?search=...&classe=...&niveau=...&statut_paiement=solde|retard
+// Pour CHAQUE élève (filtré éventuellement) : total dû, total payé, reste à
+// payer et statut ("solde" / "partiel" / "non_paye"), calculés avec la même
+// logique que la fiche élève de la page Paiements (calculerFrais + réduction
+// active + somme des paiements). Sert la page "Retards".
+router.get('/bilan', requireAuth, async (req, res) => {
+  const {
+    search = '',
+    classe = '',
+    niveau = '',
+    statut_paiement: statutPaiementFiltre = ''
+  } = req.query
+
+  try {
+    const { lignes, resume } = await calculerBilanEleves({ search, classe, niveau, statutPaiementFiltre })
+    res.json({ lignes, resume })
+  } catch (err) {
+    console.error('[eleves] erreur bilan:', err.message)
+    res.status(500).json({ error: 'Erreur lors du calcul du bilan' })
+  }
+})
+
+// GET /api/eleves/bilan/export?search=...&classe=...&niveau=...&statut_paiement=solde|retard
+// Même filtre que /bilan, mais renvoie un fichier .xlsx prêt à télécharger
+// (une ligne par élève : matricule, nom, classe, total dû/payé/reste, statut).
+// Utile pour relancer les parents en retard de paiement.
+router.get('/bilan/export', requireAuth, async (req, res) => {
+  const {
+    search = '',
+    classe = '',
+    niveau = '',
+    statut_paiement: statutPaiementFiltre = ''
+  } = req.query
+
+  let lignes
+  try {
+    ;({ lignes } = await calculerBilanEleves({ search, classe, niveau, statutPaiementFiltre }))
+  } catch (err) {
+    console.error('[eleves] erreur export bilan:', err.message)
+    return res.status(500).json({ error: 'Erreur lors du calcul du bilan' })
+  }
+
+  const LABEL_STATUT = { solde: 'Soldé', partiel: 'Partiel', non_paye: 'Non payé' }
+  const entetes = ['Matricule', 'Nom', 'Classe', 'Total dû (FCFA)', 'Total payé (FCFA)', 'Reste à payer (FCFA)', 'Statut']
+  const donnees = lignes.map((l) => [
+    l.matricule,
+    l.nom,
+    l.classe || '',
+    l.total_du,
+    l.total_paye,
+    l.reste_a_payer,
+    LABEL_STATUT[l.statut_paiement] || l.statut_paiement
+  ])
+
+  const feuille = XLSX.utils.aoa_to_sheet([entetes, ...donnees])
+  feuille['!cols'] = [
+    { wch: 14 }, { wch: 30 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 10 }
+  ]
+
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, feuille, 'Retards')
+
+  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  res.setHeader('Content-Disposition', 'attachment; filename="retards_paiements.xlsx"')
+  res.send(buffer)
 })
 
 // PUT /api/eleves/:id  { nom, classe, statut, niveau, affecte, redoublant }

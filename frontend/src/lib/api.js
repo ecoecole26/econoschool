@@ -53,6 +53,25 @@ export const api = {
     const qs = new URLSearchParams(params).toString()
     return request(`/eleves/bilan${qs ? `?${qs}` : ''}`)
   },
+  exporterBilanEleves: async (params = {}) => {
+    const qs = new URLSearchParams(params).toString()
+    const res = await fetch(`${API_URL}/eleves/bilan/export${qs ? `?${qs}` : ''}`, {
+      headers: { ...authHeaders() }
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || `Erreur ${res.status}`)
+    }
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'retards_paiements.xlsx'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  },
   updateEleve: (id, payload) =>
     request(`/eleves/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteEleve: (id) => request(`/eleves/${id}`, { method: 'DELETE' }),
