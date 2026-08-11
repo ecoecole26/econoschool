@@ -12,7 +12,7 @@ import Caisse from './pages/Caisse.jsx'
 import Reductions from './pages/Reductions.jsx'
 import Retards from './pages/Retards.jsx'
 import ProfilEleve from './pages/ProfilEleve.jsx'
-import Rapports from './pages/Rapports.jsx'
+import TableauDeBord from './pages/TableauDeBord.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
 
 function RequireAuth({ children }) {
@@ -38,10 +38,7 @@ export default function App() {
       <Route path="/banque" element={protect(<Banque />)} />
 
       {/* Reste du menu */}
-      <Route
-        path="/tableau-de-bord"
-        element={protect(<ComingSoon title="Tableau de bord" icon="📊" />)}
-      />
+      <Route path="/tableau-de-bord" element={protect(<TableauDeBord />)} />
       <Route path="/eleves" element={protect(<Eleves />)} />
       <Route path="/paiements" element={protect(<Paiements />)} />
       <Route path="/caisse" element={protect(<Caisse />)} />
@@ -50,7 +47,10 @@ export default function App() {
         element={protect(<ComingSoon title="Dépenses" icon="📤" />)}
       />
       <Route path="/reductions" element={protect(<Reductions />)} />
-      <Route path="/rapports" element={protect(<Rapports />)} />
+      <Route
+        path="/rapports"
+        element={protect(<ComingSoon title="Rapports" icon="📈" />)}
+      />
       <Route path="/retards" element={protect(<Retards />)} />
       <Route path="/eleves/:matricule/profil" element={protect(<ProfilEleve />)} />
       <Route

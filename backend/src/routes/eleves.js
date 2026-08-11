@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { calculerFrais } from '../lib/frais.js'
+import { fetchTout } from '../lib/supabasePagination.js'
 
 const router = Router()
 
@@ -33,60 +34,71 @@ const EXEMPLE_MODELE = [
   'Admis', 'NRedoublant', '', 'Affecte'
 ]
 
-// GET /api/eleves?search=...&classe=...&statut=...
+// GET /api/eleves?search=...&classe=...&statut=...&page=1&pageSize=60
 router.get('/', requireAuth, async (req, res) => {
   const { search = '', classe = '', statut = '' } = req.query
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+  const pageSize = Math.min(200, Math.max(1, parseInt(req.query.pageSize, 10) || 60))
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
 
-  let query = supabase
-    .from('eleves')
-    .select('*', { count: 'exact' })
-    .order('nom', { ascending: true })
-    .limit(200)
-
-  if (search) {
-    query = query.or(`nom.ilike.%${search}%,matricule.ilike.%${search}%`)
-  }
-  if (classe) {
-    query = query.ilike('classe', `%${classe}%`)
-  }
-  if (statut) {
-    query = query.eq('statut', statut)
+  function appliquerFiltres(q) {
+    if (search) q = q.or(`nom.ilike.%${search}%,matricule.ilike.%${search}%`)
+    if (classe) q = q.ilike('classe', `%${classe}%`)
+    if (statut) q = q.eq('statut', statut)
+    return q
   }
 
-  const { data, error, count } = await query
+  const requetePage = appliquerFiltres(
+    supabase.from('eleves').select('*', { count: 'exact' }).order('nom', { ascending: true })
+  ).range(from, to)
+
+  const requeteActifs = appliquerFiltres(
+    supabase.from('eleves').select('id', { count: 'exact', head: true }).eq('statut', 'Actif')
+  )
+
+  const [{ data, error, count }, { count: totalActifs, error: errActifs }] = await Promise.all([
+    requetePage,
+    requeteActifs
+  ])
 
   if (error) {
     console.error('[eleves] erreur Supabase:', error.message)
     return res.status(500).json({ error: 'Erreur lors de la lecture des élèves' })
   }
+  if (errActifs) {
+    console.error('[eleves] erreur comptage actifs:', errActifs.message)
+  }
 
-  res.json({ eleves: data, total: count })
+  res.json({
+    eleves: data,
+    total: count,
+    total_actifs: totalActifs ?? null,
+    page,
+    pageSize,
+    totalPages: count ? Math.ceil(count / pageSize) : 1
+  })
 })
 
 // Calcule le bilan (total dû/payé/reste + statut) pour chaque élève
 // correspondant aux filtres donnés. Partagé par GET /bilan (JSON, pour la
 // page Retards) et GET /bilan/export (fichier Excel).
 async function calculerBilanEleves({ search = '', classe = '', niveau = '', statutPaiementFiltre = '' }) {
-  let queryEleves = supabase.from('eleves').select('*').order('nom', { ascending: true })
-  if (search) {
-    queryEleves = queryEleves.or(`nom.ilike.%${search}%,matricule.ilike.%${search}%`)
-  }
-  if (classe) queryEleves = queryEleves.ilike('classe', `%${classe}%`)
-  if (niveau) queryEleves = queryEleves.eq('niveau', niveau)
+  const eleves = await fetchTout((from, to) => {
+    let q = supabase.from('eleves').select('*').order('nom', { ascending: true })
+    if (search) q = q.or(`nom.ilike.%${search}%,matricule.ilike.%${search}%`)
+    if (classe) q = q.ilike('classe', `%${classe}%`)
+    if (niveau) q = q.eq('niveau', niveau)
+    return q.range(from, to)
+  })
 
-  const { data: eleves, error: errEleves } = await queryEleves
-  if (errEleves) throw new Error(errEleves.message)
-
-  const [{ data: tarifs, error: errTarifs }, { data: reductions, error: errReductions }, { data: paiements, error: errPaiements }] =
-    await Promise.all([
-      supabase.from('tarifs').select('*'),
-      supabase.from('reductions').select('eleve_id, pourcentage').eq('statut', 'active'),
-      supabase.from('paiements').select('eleve_id, montant')
-    ])
-
-  if (errTarifs) throw new Error(errTarifs.message)
-  if (errReductions) throw new Error(errReductions.message)
-  if (errPaiements) throw new Error(errPaiements.message)
+  const [tarifs, reductions, paiements] = await Promise.all([
+    fetchTout((from, to) => supabase.from('tarifs').select('*').range(from, to)),
+    fetchTout((from, to) =>
+      supabase.from('reductions').select('eleve_id, pourcentage').eq('statut', 'active').range(from, to)
+    ),
+    fetchTout((from, to) => supabase.from('paiements').select('eleve_id, montant').range(from, to))
+  ])
 
   const tarifParNiveau = new Map((tarifs || []).map((t) => [t.niveau, t]))
   const reductionParEleve = new Map((reductions || []).map((r) => [r.eleve_id, r.pourcentage]))
@@ -112,6 +124,7 @@ async function calculerBilanEleves({ search = '', classe = '', niveau = '', stat
       classe: eleve.classe,
       photo_url: eleve.photo_url,
       affecte: eleve.affecte,
+      statut: eleve.statut,
       total_du: frais.total_du,
       total_paye: totalPaye,
       reste_a_payer,
@@ -127,6 +140,8 @@ async function calculerBilanEleves({ search = '', classe = '', niveau = '', stat
 
   const resume = {
     total_eleves: lignes.length,
+    total_actifs: lignes.filter((l) => (l.statut || '').toLowerCase() === 'actif').length,
+    affectes: lignes.filter((l) => l.affecte).length,
     solde: lignes.filter((l) => l.statut_paiement === 'solde').length,
     en_retard: lignes.filter((l) => l.statut_paiement !== 'solde').length,
     total_du: lignes.reduce((s, l) => s + l.total_du, 0),

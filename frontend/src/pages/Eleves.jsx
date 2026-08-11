@@ -26,6 +26,10 @@ export default function Eleves() {
   const [classe, setClasse] = useState('')
   const [eleves, setEleves] = useState([])
   const [total, setTotal] = useState(0)
+  const [totalActifs, setTotalActifs] = useState(0)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const pageSize = 60
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -45,13 +49,16 @@ export default function Eleves() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  async function load() {
+  async function load(pageDemandee = page) {
     setLoading(true)
     setError('')
     try {
-      const { eleves, total } = await api.getEleves({ search, classe })
-      setEleves(eleves || [])
-      setTotal(total ?? (eleves || []).length)
+      const res = await api.getEleves({ search, classe, page: pageDemandee, pageSize })
+      setEleves(res.eleves || [])
+      setTotal(res.total ?? (res.eleves || []).length)
+      setTotalActifs(res.total_actifs ?? 0)
+      setTotalPages(res.totalPages || 1)
+      setPage(res.page || pageDemandee)
     } catch (err) {
       setError(err.message || 'Erreur de chargement')
     } finally {
@@ -60,13 +67,21 @@ export default function Eleves() {
   }
 
   useEffect(() => {
-    load()
+    load(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function handleSearchSubmit(e) {
     e.preventDefault()
-    load()
+    load(1)
+  }
+
+  function allerPagePrecedente() {
+    if (page > 1) load(page - 1)
+  }
+
+  function allerPageSuivante() {
+    if (page < totalPages) load(page + 1)
   }
 
   function openEdit(el) {
@@ -115,7 +130,8 @@ export default function Eleves() {
     }
   }
 
-  const actifs = eleves.filter((e) => (e.statut || '').toLowerCase() === 'actif').length
+  // total_actifs vient du backend (comptage exact sur TOUS les élèves filtrés),
+  // et non plus d'un filtre local sur les 60 élèves de la page courante.
 
   return (
     <Layout title="Élèves">
@@ -156,7 +172,7 @@ export default function Eleves() {
             <input
               value={classe}
               onChange={(e) => setClasse(e.target.value)}
-              onBlur={load}
+              onBlur={() => load(1)}
               placeholder="ex: 6eme1"
               className="px-3 py-1.5 border border-[#d7e8de] rounded-lg text-sm w-28"
             />
@@ -171,7 +187,7 @@ export default function Eleves() {
 
         <div className="flex flex-wrap gap-2 mb-4">
           <StatPill label="Effectif total" value={total} variant="vert" />
-          <StatPill label="Actifs" value={actifs} variant="teal" />
+          <StatPill label="Actifs" value={totalActifs} variant="teal" />
         </div>
 
         {error && (
@@ -284,6 +300,32 @@ export default function Eleves() {
               )}
             </tbody>
           </table>
+        )}
+
+        {!loading && eleves.length > 0 && (
+          <div className="flex items-center justify-between gap-3 mt-5 pt-4 border-t border-[#e3ebe6]">
+            <span className="text-xs text-[#6b7d74]">
+              Page {page} sur {totalPages} — {total} élève{total > 1 ? 's' : ''} au total
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={allerPagePrecedente}
+                disabled={page <= 1}
+                className="px-3.5 py-1.5 rounded-lg border border-[#d7e8de] text-sm font-semibold text-vert-fonce disabled:opacity-40"
+              >
+                ← Précédent
+              </button>
+              <button
+                type="button"
+                onClick={allerPageSuivante}
+                disabled={page >= totalPages}
+                className="px-3.5 py-1.5 rounded-lg border border-[#d7e8de] text-sm font-semibold text-vert-fonce disabled:opacity-40"
+              >
+                Suivant →
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
