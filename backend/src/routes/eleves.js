@@ -3,6 +3,7 @@ import multer from 'multer'
 import * as XLSX from 'xlsx'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
+import { calculerFrais } from '../lib/frais.js'
 
 const router = Router()
 
@@ -60,6 +61,92 @@ router.get('/', requireAuth, async (req, res) => {
   }
 
   res.json({ eleves: data, total: count })
+})
+
+// GET /api/eleves/bilan?search=...&classe=...&niveau=...&statut_paiement=solde|retard
+// Pour CHAQUE élève (filtré éventuellement) : total dû, total payé, reste à
+// payer et statut ("solde" / "partiel" / "non_paye"), calculés avec la même
+// logique que la fiche élève de la page Paiements (calculerFrais + réduction
+// active + somme des paiements). Sert la page "Retards".
+router.get('/bilan', requireAuth, async (req, res) => {
+  const {
+    search = '',
+    classe = '',
+    niveau = '',
+    statut_paiement: statutPaiementFiltre = ''
+  } = req.query
+
+  let queryEleves = supabase.from('eleves').select('*').order('nom', { ascending: true })
+  if (search) {
+    queryEleves = queryEleves.or(`nom.ilike.%${search}%,matricule.ilike.%${search}%`)
+  }
+  if (classe) queryEleves = queryEleves.ilike('classe', `%${classe}%`)
+  if (niveau) queryEleves = queryEleves.eq('niveau', niveau)
+
+  const { data: eleves, error: errEleves } = await queryEleves
+  if (errEleves) {
+    console.error('[eleves] erreur bilan (élèves):', errEleves.message)
+    return res.status(500).json({ error: 'Erreur lors de la lecture des élèves' })
+  }
+
+  const [{ data: tarifs, error: errTarifs }, { data: reductions, error: errReductions }, { data: paiements, error: errPaiements }] =
+    await Promise.all([
+      supabase.from('tarifs').select('*'),
+      supabase.from('reductions').select('eleve_id, pourcentage').eq('statut', 'active'),
+      supabase.from('paiements').select('eleve_id, montant')
+    ])
+
+  if (errTarifs) return res.status(500).json({ error: errTarifs.message })
+  if (errReductions) return res.status(500).json({ error: errReductions.message })
+  if (errPaiements) return res.status(500).json({ error: errPaiements.message })
+
+  const tarifParNiveau = new Map((tarifs || []).map((t) => [t.niveau, t]))
+  const reductionParEleve = new Map((reductions || []).map((r) => [r.eleve_id, r.pourcentage]))
+  const totalPayeParEleve = new Map()
+  for (const p of paiements || []) {
+    totalPayeParEleve.set(p.eleve_id, (totalPayeParEleve.get(p.eleve_id) || 0) + Number(p.montant))
+  }
+
+  let lignes = (eleves || []).map((eleve) => {
+    const tarif = tarifParNiveau.get(eleve.niveau) || {}
+    const reductionPourcentage = reductionParEleve.get(eleve.id) || 0
+    const frais = calculerFrais(tarif, eleve, reductionPourcentage)
+    const totalPaye = totalPayeParEleve.get(eleve.id) || 0
+    const reste_a_payer = Math.max(frais.total_du - totalPaye, 0)
+    const statut_paiement =
+      reste_a_payer <= 0 ? 'solde' : totalPaye > 0 ? 'partiel' : 'non_paye'
+
+    return {
+      id: eleve.id,
+      matricule: eleve.matricule,
+      nom: eleve.nom,
+      niveau: eleve.niveau,
+      classe: eleve.classe,
+      photo_url: eleve.photo_url,
+      affecte: eleve.affecte,
+      total_du: frais.total_du,
+      total_paye: totalPaye,
+      reste_a_payer,
+      statut_paiement
+    }
+  })
+
+  if (statutPaiementFiltre === 'solde') {
+    lignes = lignes.filter((l) => l.statut_paiement === 'solde')
+  } else if (statutPaiementFiltre === 'retard') {
+    lignes = lignes.filter((l) => l.statut_paiement !== 'solde')
+  }
+
+  const resume = {
+    total_eleves: lignes.length,
+    solde: lignes.filter((l) => l.statut_paiement === 'solde').length,
+    en_retard: lignes.filter((l) => l.statut_paiement !== 'solde').length,
+    total_du: lignes.reduce((s, l) => s + l.total_du, 0),
+    total_paye: lignes.reduce((s, l) => s + l.total_paye, 0),
+    total_reste: lignes.reduce((s, l) => s + l.reste_a_payer, 0)
+  }
+
+  res.json({ lignes, resume })
 })
 
 // PUT /api/eleves/:id  { nom, classe, statut, niveau, affecte, redoublant }

@@ -49,6 +49,10 @@ export const api = {
     const qs = new URLSearchParams(params).toString()
     return request(`/eleves${qs ? `?${qs}` : ''}`)
   },
+  getBilanEleves: (params = {}) => {
+    const qs = new URLSearchParams(params).toString()
+    return request(`/eleves/bilan${qs ? `?${qs}` : ''}`)
+  },
   updateEleve: (id, payload) =>
     request(`/eleves/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteEleve: (id) => request(`/eleves/${id}`, { method: 'DELETE' }),

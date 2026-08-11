@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
 import SegmentedTabs from '../components/SegmentedTabs.jsx'
 import StatPill from '../components/StatPill.jsx'
@@ -19,6 +20,7 @@ function Badge({ ok, labelOui, labelNon }) {
 }
 
 export default function Eleves() {
+  const navigate = useNavigate()
   const [tab, setTab] = useState('liste')
   const [search, setSearch] = useState('')
   const [classe, setClasse] = useState('')
@@ -245,6 +247,13 @@ export default function Eleves() {
                   </td>
                   <td className="py-1.5 pr-3">
                     <div className="flex justify-end gap-2">
+                      <IconButton
+                        variant="teal"
+                        title="Profil et bilan des versements"
+                        onClick={() => navigate(`/eleves/${el.matricule}/profil`)}
+                      >
+                        💰
+                      </IconButton>
                       <IconButton variant="teal" title="Voir" onClick={() => setSelected(el)}>
                         👁️
                       </IconButton>
