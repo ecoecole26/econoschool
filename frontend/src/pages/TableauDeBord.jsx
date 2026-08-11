@@ -81,11 +81,12 @@ export default function TableauDeBord() {
 
             <Carte label="Caisse 1 (principale)" valeur={formatFCFA(soldeCaisse1)} variante="vertDoux" />
             <Carte label="Caisse 2 (secondaire)" valeur={formatFCFA(soldeCaisse2)} variante="vertDoux" />
-            <Carte label="Somme encaissée" valeur={formatFCFA(resume?.total_paye)} variante="bleu" />
-            <Carte label="Reste à payer" valeur={formatFCFA(resume?.total_reste)} variante="bleu" />
 
             <Carte label="Élèves en retard" valeur={resume?.en_retard ?? 0} variante="blancVert" />
             <Carte label="Élèves ayant soldé" valeur={resume?.solde ?? 0} variante="blancVert" />
+
+            <Carte label="Somme encaissée" valeur={formatFCFA(resume?.total_paye)} variante="bleu" />
+            <Carte label="Reste à payer" valeur={formatFCFA(resume?.total_reste)} variante="bleu" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
