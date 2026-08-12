@@ -21,6 +21,13 @@ router.get('/', requireAuth, async (req, res) => {
 
   const typesVisibles = caissesVisiblesPourRole(req.user.role)
 
+  // `journal_caisse.date` stocke un horodatage complet (date + heure), mais
+  // `fin` arrive du frontend en simple "YYYY-MM-DD" (équivalent à minuit ce
+  // jour-là) : sans correction, tout mouvement enregistré après minuit le
+  // jour "fin" lui-même serait exclu du bilan. On étend donc "fin" jusqu'à
+  // la toute fin de cette journée (23:59:59.999) avant de filtrer.
+  const finJournee = `${fin}T23:59:59.999`
+
   try {
     const [{ data: caisses, error: errCaisses }, mouvements] = await Promise.all([
       supabase.from('caisses').select('*').in('type_caisse', typesVisibles),
@@ -31,7 +38,7 @@ router.get('/', requireAuth, async (req, res) => {
           .in('caisse', typesVisibles)
           .eq('statut', 'validee')
           .gte('date', debut)
-          .lte('date', fin)
+          .lte('date', finJournee)
           .order('date', { ascending: false })
           .range(from, to)
       )
