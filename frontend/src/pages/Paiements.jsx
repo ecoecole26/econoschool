@@ -33,6 +33,21 @@ export default function Paiements() {
   const [etablissement, setEtablissement] = useState(null)
   const [recuOuvert, setRecuOuvert] = useState(false)
   const [dernierPaiement, setDernierPaiement] = useState(null) // { montant, tranche_libelle, date_paiement, valide_par }
+  const [caissesIndisponibles, setCaissesIndisponibles] = useState([]) // ['Caisse 1', ...] si fermée/pause
+
+  const LABEL_CAISSE = { principale: 'Caisse 1', secondaire: 'Caisse 2' }
+
+  function chargerStatutCaisses() {
+    api
+      .getCaisses()
+      .then(({ caisses }) => {
+        const fermees = (caisses || [])
+          .filter((c) => c.statut && c.statut !== 'ouverte')
+          .map((c) => LABEL_CAISSE[c.type_caisse] || c.type_caisse)
+        setCaissesIndisponibles(fermees)
+      })
+      .catch(() => {})
+  }
 
   useEffect(() => {
     api
@@ -43,6 +58,9 @@ export default function Paiements() {
       .getEtablissement()
       .then(({ etablissement }) => setEtablissement(etablissement || null))
       .catch(() => {})
+    chargerStatutCaisses()
+    const id = setInterval(chargerStatutCaisses, 30000)
+    return () => clearInterval(id)
   }, [])
 
   async function handleRecherche(e) {
@@ -86,6 +104,7 @@ export default function Paiements() {
       })
       setMontant('')
       setMessage('Paiement enregistré ✅')
+      chargerStatutCaisses()
     } catch (err) {
       setMessage(err.message || "Erreur lors de l'enregistrement")
     } finally {
@@ -293,6 +312,12 @@ export default function Paiements() {
                 </Field>
               </div>
 
+              {caissesIndisponibles.length > 0 && (
+                <div className="mb-3 text-sm px-3 py-2 rounded-lg bg-rose-light text-rose">
+                  {caissesIndisponibles.join(' et ')} {caissesIndisponibles.length > 1 ? 'sont fermées ou en pause' : 'est fermée ou en pause'} : ouvrez-{caissesIndisponibles.length > 1 ? 'les' : 'la'} depuis la page Caisse pour pouvoir encaisser.
+                </div>
+              )}
+
               {message && (
                 <div className="mb-3 text-sm px-3 py-2 rounded-lg bg-teal-light text-teal inline-block">
                   {message}
@@ -302,7 +327,8 @@ export default function Paiements() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleEnregistrerPaiement}
-                  disabled={saving || !montant}
+                  disabled={saving || !montant || caissesIndisponibles.length > 0}
+                  title={caissesIndisponibles.length > 0 ? 'Ouvrez les caisses avant d\'encaisser un paiement' : undefined}
                   className="px-6 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold disabled:opacity-50"
                 >
                   {saving ? 'Enregistrement…' : 'Encaisser le paiement'}

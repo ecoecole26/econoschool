@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
-import { crediterCaissesParPaiement } from '../lib/caisse.js'
+import { crediterCaissesParPaiement, getOrCreateCaisse, LABEL_CAISSE } from '../lib/caisse.js'
 import { calculerFrais, getReductionActive } from '../lib/frais.js'
 
 const router = Router()
@@ -102,6 +102,21 @@ router.post('/', requireAuth, async (req, res) => {
 
   if (errEleve || !eleve) {
     return res.status(404).json({ error: 'Élève introuvable' })
+  }
+
+  // Un paiement crédite TOUJOURS les deux caisses : si l'une des deux est
+  // fermée ou en pause, on bloque avant même de créer le paiement, plutôt
+  // que d'enregistrer un paiement dont l'argent ne rentre nulle part.
+  const [caissePrincipale, caisseSecondaire] = await Promise.all([
+    getOrCreateCaisse('principale', req.user.etablissement),
+    getOrCreateCaisse('secondaire', req.user.etablissement)
+  ])
+  const caissesFermees = [caissePrincipale, caisseSecondaire].filter((c) => c.statut !== 'ouverte')
+  if (caissesFermees.length > 0) {
+    const noms = caissesFermees.map((c) => LABEL_CAISSE[c.type_caisse]).join(' et ')
+    return res.status(409).json({
+      error: `${noms} ${caissesFermees.length > 1 ? 'sont fermées ou en pause' : 'est fermée ou en pause'} : ouvrez-${caissesFermees.length > 1 ? 'les' : 'la'} avant d'encaisser un paiement.`
+    })
   }
 
   const { data, error } = await supabase

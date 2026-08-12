@@ -80,10 +80,19 @@ export async function enregistrerMouvementCaisse({
   date,
   etablissement,
   annee_scolaire,
-  nom
+  nom,
+  ignorerStatut = false
 }) {
   const caisse = await getOrCreateCaisse(type_caisse, etablissement)
   const montantNum = Number(montant)
+
+  // Vérification centralisée : quel que soit le point d'entrée (bouton
+  // manuel +Entrée/-Sortie, ou crédit automatique déclenché par un
+  // paiement), une caisse fermée ou en pause ne doit jamais bouger.
+  if (!ignorerStatut && caisse.statut !== 'ouverte') {
+    const libelleStatut = caisse.statut === 'pause' ? 'en pause' : 'fermée'
+    throw new Error(`${LABEL_CAISSE[type_caisse]} ${libelleStatut} : impossible d'enregistrer un mouvement`)
+  }
 
   if (type_operation === TYPE_SORTIE && montantNum > caisse.solde) {
     throw new Error('Solde insuffisant dans cette caisse pour cette sortie')

@@ -81,17 +81,6 @@ router.post('/mouvements', requireAuth, async (req, res) => {
   }
 
   try {
-    const { data: caisseActuelle } = await supabase
-      .from('caisses')
-      .select('statut')
-      .eq('type_caisse', type_caisse)
-      .maybeSingle()
-
-    if (caisseActuelle && caisseActuelle.statut !== 'ouverte') {
-      const libelleStatut = caisseActuelle.statut === 'pause' ? 'en pause' : 'fermée'
-      return res.status(409).json({ error: `Cette caisse est ${libelleStatut} : ouvrez-la avant d'enregistrer un mouvement` })
-    }
-
     const { mouvement, caisse } = await enregistrerMouvementCaisse({
       type_caisse,
       type_operation,
