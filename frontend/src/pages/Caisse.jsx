@@ -252,101 +252,112 @@ function CarteCaisse({ caisse, role, onOperation, onChangerStatut, changement })
   const estOuverte = caisse.statut === 'ouverte'
   const estFermee = caisse.statut === 'fermee'
   const estEnPause = caisse.statut === 'pause'
+  const estActionnable = estOuverte || estEnPause // caisse déjà créée, pas juste "pas encore ouverte"
 
   return (
-    <div className="bg-white rounded-2xl border border-[#e3ebe6] p-5">
-      <div className="flex items-start justify-between mb-3 gap-2">
-        <div>
-          <div className="text-xs font-semibold text-[#9aa8a1] uppercase mb-1">
-            {LABEL_CAISSE[caisse.type_caisse]}
-          </div>
-          <div className="text-2xl font-display font-bold text-vert-fonce">
-            {formatFCFA(caisse.solde)}
-          </div>
-          {caisse.statut === 'ouverte' && caisse.ouverte_par && (
-            <div className="text-[11px] text-[#9aa8a1] mt-1">
-              Ouverte par {caisse.ouverte_par}
-              {caisse.ouverte_le ? ` — ${formatDateHeure(caisse.ouverte_le)}` : ''}
-            </div>
-          )}
+    <div className="bg-white rounded-2xl border border-[#e3ebe6] p-5 flex flex-col h-full">
+      {/* Zone montant : dégagée, sans bouton autour, pour rester lisible en un coup d'œil. */}
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <div className="text-xs font-semibold text-[#9aa8a1] uppercase">
+          {LABEL_CAISSE[caisse.type_caisse]}
         </div>
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${statutInfo.classe}`}>
           {statutInfo.label}
         </span>
       </div>
-
-      {/* Boutons ouvrir / mettre en pause / fermer la caisse */}
-      <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-[#f1f5f2]">
-        {!estOuverte && (
-          <button
-            onClick={() => onChangerStatut('ouverte')}
-            disabled={changement}
-            className="px-3 py-1.5 rounded-full bg-teal text-white text-xs font-semibold disabled:opacity-60"
-          >
-            🔓 Ouvrir
-          </button>
-        )}
-        {estOuverte && (
-          <button
-            onClick={() => onChangerStatut('pause')}
-            disabled={changement}
-            className="px-3 py-1.5 rounded-full bg-orange text-white text-xs font-semibold disabled:opacity-60"
-          >
-            ⏸️ Mettre en pause
-          </button>
-        )}
-        {estEnPause && (
-          <button
-            onClick={() => onChangerStatut('ouverte')}
-            disabled={changement}
-            className="px-3 py-1.5 rounded-full bg-teal text-white text-xs font-semibold disabled:opacity-60"
-          >
-            ▶️ Reprendre
-          </button>
-        )}
-        {(estOuverte || estEnPause) && (
-          <button
-            onClick={() => onChangerStatut('fermee')}
-            disabled={changement}
-            className="px-3 py-1.5 rounded-full border border-rose text-rose text-xs font-semibold disabled:opacity-60"
-          >
-            🔒 Fermer
-          </button>
-        )}
+      <div className="text-3xl font-display font-bold text-vert-fonce mb-1">
+        {formatFCFA(caisse.solde)}
+      </div>
+      {/* Hauteur réservée même sans info, pour que les deux cartes restent alignées. */}
+      <div className="text-[11px] text-[#9aa8a1] min-h-[16px] mb-4">
+        {estOuverte && caisse.ouverte_par
+          ? `Ouverte par ${caisse.ouverte_par}${caisse.ouverte_le ? ` — ${formatDateHeure(caisse.ouverte_le)}` : ''}`
+          : ''}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => onOperation('Encaissement')}
-          disabled={!estOuverte}
-          title={!estOuverte ? "Ouvrez la caisse pour enregistrer un mouvement" : undefined}
-          className="px-4 py-1.5 rounded-full bg-vert-fonce text-white text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          + Entrée
-        </button>
-        {peutSortie && (
+      {/* Pousse les deux rangées de boutons en bas de carte, alignées entre
+          Caisse 1 et Caisse 2 quelle que soit la longueur du texte au-dessus. */}
+      <div className="mt-auto">
+        {/* Rangée 1 : état de la caisse (ouvrir / pause / fermer), 3 colonnes
+            fixes pour que les boutons tombent exactement aux mêmes positions
+            sur les deux cartes. */}
+        <div className="grid grid-cols-3 gap-2 mb-3 pb-3 border-b border-[#f1f5f2]">
+          {!estActionnable ? (
+            <button
+              onClick={() => onChangerStatut('ouverte')}
+              disabled={changement}
+              className="col-span-3 px-3 py-1.5 rounded-full bg-teal text-white text-xs font-semibold disabled:opacity-60"
+            >
+              🔓 Ouvrir la caisse
+            </button>
+          ) : (
+            <>
+              {estOuverte ? (
+                <button
+                  onClick={() => onChangerStatut('pause')}
+                  disabled={changement}
+                  className="px-2 py-1.5 rounded-full bg-bleu text-white text-xs font-semibold disabled:opacity-60 whitespace-nowrap"
+                >
+                  ⏸️ Pause
+                </button>
+              ) : (
+                <button
+                  onClick={() => onChangerStatut('ouverte')}
+                  disabled={changement}
+                  className="px-2 py-1.5 rounded-full bg-teal text-white text-xs font-semibold disabled:opacity-60 whitespace-nowrap"
+                >
+                  ▶️ Reprendre
+                </button>
+              )}
+              <button
+                onClick={() => onChangerStatut('fermee')}
+                disabled={changement}
+                className="col-start-3 px-2 py-1.5 rounded-full border border-rose text-rose text-xs font-semibold disabled:opacity-60 whitespace-nowrap"
+              >
+                🔒 Fermer
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Rangée 2 : opérations (Entrée / Sortie), même largeur sur les
+            deux cartes grâce au grid 2 colonnes. */}
+        <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={() => onOperation('Sortie')}
+            onClick={() => onOperation('Encaissement')}
             disabled={!estOuverte}
             title={!estOuverte ? "Ouvrez la caisse pour enregistrer un mouvement" : undefined}
-            className="px-4 py-1.5 rounded-full bg-orange text-white text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-1.5 rounded-full bg-vert-fonce text-white text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            − Sortie
+            + Entrée
           </button>
+          {peutSortie ? (
+            <button
+              onClick={() => onOperation('Sortie')}
+              disabled={!estOuverte}
+              title={!estOuverte ? "Ouvrez la caisse pour enregistrer un mouvement" : undefined}
+              className="px-4 py-1.5 rounded-full bg-orange text-white text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              − Sortie
+            </button>
+          ) : (
+            <div />
+          )}
+        </div>
+
+        {!peutSortie && (
+          <p className="text-xs text-[#9aa8a1] mt-2">
+            Sorties/retraits/dépenses réservés au Fondateur.
+          </p>
+        )}
+        {!estOuverte && estActionnable && (
+          <p className="text-xs text-[#9aa8a1] mt-2">
+            {estEnPause
+              ? 'Caisse en pause : reprenez-la pour enregistrer un mouvement.'
+              : 'Caisse fermée : ouvrez-la pour enregistrer un mouvement.'}
+          </p>
         )}
       </div>
-      {!peutSortie && (
-        <p className="text-xs text-[#9aa8a1] mt-2">
-          Sorties/retraits/dépenses réservés au Fondateur.
-        </p>
-      )}
-      {!estOuverte && (
-        <p className="text-xs text-[#9aa8a1] mt-2">
-          {estEnPause
-            ? 'Caisse en pause : reprenez-la pour enregistrer un mouvement.'
-            : 'Caisse fermée : ouvrez-la pour enregistrer un mouvement.'}
-        </p>
-      )}
     </div>
   )
 }
