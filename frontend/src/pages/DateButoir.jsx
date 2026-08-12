@@ -9,13 +9,19 @@ function formatDateAffichage(iso) {
   return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
 }
 
+function formatDateCourte(iso) {
+  if (!iso) return null
+  return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
 export default function DateButoir() {
   const [niveaux, setNiveaux] = useState([])
   const [global, setGlobal] = useState('')
   const [parNiveau, setParNiveau] = useState({})
+  const [niveauSelectionne, setNiveauSelectionne] = useState('')
   const [loading, setLoading] = useState(true)
   const [savingGlobal, setSavingGlobal] = useState(false)
-  const [savingNiveau, setSavingNiveau] = useState('')
+  const [savingNiveau, setSavingNiveau] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
@@ -24,9 +30,11 @@ export default function DateButoir() {
     setError('')
     try {
       const [{ tarifs }, dates] = await Promise.all([api.getTarifs(), api.getDatesButoir()])
-      setNiveaux((tarifs || []).map((t) => t.niveau).filter(Boolean))
+      const listeNiveaux = (tarifs || []).map((t) => t.niveau).filter(Boolean)
+      setNiveaux(listeNiveaux)
       setGlobal(dates.global || '')
       setParNiveau(dates.parNiveau || {})
+      setNiveauSelectionne((sel) => sel || listeNiveaux[0] || '')
     } catch (err) {
       setError(err.message || 'Erreur lors du chargement')
     } finally {
@@ -52,17 +60,18 @@ export default function DateButoir() {
     }
   }
 
-  async function handleSaveNiveau(niveau) {
-    setSavingNiveau(niveau)
+  async function handleSaveNiveau(niveau, date) {
+    setSavingNiveau(true)
     setMessage('')
     setError('')
     try {
-      await api.saveDateButoirNiveau(niveau, parNiveau[niveau] || null)
+      await api.saveDateButoirNiveau(niveau, date || null)
+      setParNiveau((m) => ({ ...m, [niveau]: date || null }))
       setMessage(`Date butoir pour ${niveau} enregistrée ✅`)
     } catch (err) {
       setError(err.message || "Erreur lors de l'enregistrement")
     } finally {
-      setSavingNiveau('')
+      setSavingNiveau(false)
     }
   }
 
@@ -84,25 +93,33 @@ export default function DateButoir() {
       {loading ? (
         <div className="text-sm text-[#6b7d74]">Chargement…</div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+          {/* Carte globale : version compacte, champ + bouton sur une même
+              ligne pour occuper moins d'espace vertical. */}
           <Card title="Date butoir globale" icon="🌐">
-            <p className="text-xs text-[#6b7d74] mb-4">
-              S'applique à tous les niveaux qui n'ont pas de date spécifique ci-contre. Tant qu'aucune date
-              n'est définie, un élève est considéré « en retard » dès qu'il n'a pas soldé (comportement
-              d'origine).
+            <p className="text-xs text-[#6b7d74] mb-3">
+              S'applique à tous les niveaux sans date spécifique. Sans date définie, un élève est « en retard »
+              dès qu'il n'a pas soldé.
             </p>
-            <Field label="Date limite de paiement">
-              <TextInput type="date" value={global} onChange={(e) => setGlobal(e.target.value)} />
-            </Field>
-            <div className="flex items-center gap-3 mt-3">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Field label="Date limite de paiement">
+                  <TextInput type="date" value={global} onChange={(e) => setGlobal(e.target.value)} />
+                </Field>
+              </div>
               <button
                 onClick={handleSaveGlobal}
                 disabled={savingGlobal}
-                className="px-4 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold disabled:opacity-60"
+                className="px-4 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold disabled:opacity-60 mb-3 whitespace-nowrap"
               >
-                {savingGlobal ? 'Enregistrement…' : 'Enregistrer'}
+                {savingGlobal ? '…' : 'Enregistrer'}
               </button>
-              {global && (
+            </div>
+            {global && (
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-[#6b7d74]">
+                  En retard après le <strong>{formatDateAffichage(global)}</strong>.
+                </p>
                 <button
                   onClick={() => setGlobal('')}
                   disabled={savingGlobal}
@@ -110,46 +127,80 @@ export default function DateButoir() {
                 >
                   Effacer
                 </button>
-              )}
-            </div>
-            {global && (
-              <p className="text-xs text-[#6b7d74] mt-3">
-                Actuellement : élèves non soldés en retard après le <strong>{formatDateAffichage(global)}</strong>.
-              </p>
+              </div>
             )}
           </Card>
 
+          {/* Dates par niveau : les niveaux sont affichés en pilules (2 par
+              ligne), un seul sélectionné à la fois -> on édite sa date dans
+              un unique champ ci-dessous, au lieu d'une ligne par niveau.
+              Beaucoup plus compact quand il y a plus de 3-4 niveaux. */}
           <Card title="Dates par niveau (optionnel)" icon="🎓">
-            <p className="text-xs text-[#6b7d74] mb-4">
-              Remplace la date globale pour un niveau précis. Laisser vide pour utiliser la date globale.
+            <p className="text-xs text-[#6b7d74] mb-3">
+              Remplace la date globale pour un niveau précis. Choisissez un niveau, puis définissez sa date.
             </p>
             {niveaux.length === 0 ? (
               <p className="text-sm text-[#9aa8a1] py-4 text-center">
                 Aucun niveau configuré — voir la page « Tarifs par niveau ».
               </p>
             ) : (
-              <div className="space-y-3">
-                {niveaux.map((niveau) => (
-                  <div key={niveau} className="flex items-end gap-2">
-                    <Field label={niveau}>
-                      <TextInput
-                        type="date"
-                        value={parNiveau[niveau] || ''}
-                        onChange={(e) =>
-                          setParNiveau((m) => ({ ...m, [niveau]: e.target.value }))
-                        }
-                      />
-                    </Field>
+              <>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  {niveaux.map((niveau) => {
+                    const actif = niveau === niveauSelectionne
+                    const date = parNiveau[niveau]
+                    return (
+                      <button
+                        key={niveau}
+                        type="button"
+                        onClick={() => setNiveauSelectionne(niveau)}
+                        className={`text-left px-3 py-2 rounded-xl border transition ${
+                          actif
+                            ? 'bg-bleu border-bleu text-white'
+                            : 'bg-white border-[#d7e8de] text-vert-fonce hover:bg-teal-light'
+                        }`}
+                      >
+                        <div className="text-sm font-semibold truncate">{niveau}</div>
+                        <div className={`text-[11px] ${actif ? 'text-white/80' : 'text-[#9aa8a1]'}`}>
+                          {date ? formatDateCourte(date) : 'Non défini'}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {niveauSelectionne && (
+                  <div className="flex items-end gap-2 pt-3 border-t border-[#f1f5f2]">
+                    <div className="flex-1">
+                      <Field label={`Date limite — ${niveauSelectionne}`}>
+                        <TextInput
+                          type="date"
+                          value={parNiveau[niveauSelectionne] || ''}
+                          onChange={(e) =>
+                            setParNiveau((m) => ({ ...m, [niveauSelectionne]: e.target.value }))
+                          }
+                        />
+                      </Field>
+                    </div>
                     <button
-                      onClick={() => handleSaveNiveau(niveau)}
-                      disabled={savingNiveau === niveau}
+                      onClick={() => handleSaveNiveau(niveauSelectionne, parNiveau[niveauSelectionne])}
+                      disabled={savingNiveau}
                       className="px-3.5 py-2.5 rounded-xl border border-vert-fonce text-vert-fonce text-xs font-semibold disabled:opacity-60 mb-3 whitespace-nowrap"
                     >
-                      {savingNiveau === niveau ? '…' : 'Enregistrer'}
+                      {savingNiveau ? '…' : 'Enregistrer'}
                     </button>
+                    {parNiveau[niveauSelectionne] && (
+                      <button
+                        onClick={() => handleSaveNiveau(niveauSelectionne, '')}
+                        disabled={savingNiveau}
+                        className="text-xs text-[#6b7d74] underline mb-4 whitespace-nowrap"
+                      >
+                        Effacer
+                      </button>
+                    )}
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </Card>
         </div>

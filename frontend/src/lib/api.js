@@ -72,6 +72,24 @@ export const api = {
     a.remove()
     window.URL.revokeObjectURL(url)
   },
+  exporterRapport: async () => {
+    const res = await fetch(`${API_URL}/rapports/export`, {
+      headers: { ...authHeaders() }
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || `Erreur ${res.status}`)
+    }
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'rapport_general.xlsx'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  },
   updateEleve: (id, payload) =>
     request(`/eleves/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteEleve: (id) => request(`/eleves/${id}`, { method: 'DELETE' }),

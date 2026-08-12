@@ -90,7 +90,7 @@ function dateButoirPourNiveau(niveau, { global, parNiveau }) {
   return (niveau && parNiveau[niveau]) || global || null
 }
 
-async function calculerBilanEleves({ search = '', classe = '', niveau = '', statutPaiementFiltre = '' }) {
+export async function calculerBilanEleves({ search = '', classe = '', niveau = '', statutPaiementFiltre = '' }) {
   const eleves = await fetchTout((from, to) => {
     let q = supabase.from('eleves').select('*').order('nom', { ascending: true })
     if (search) q = q.or(`nom.ilike.%${search}%,matricule.ilike.%${search}%`)

@@ -113,44 +113,51 @@ export default function BilanPeriodique() {
           <h3 className="text-sm font-display font-bold text-vert-fonce mb-3">
             📜 Mouvements de la période ({data.mouvements.length})
           </h3>
+          {/* Hauteur plafonnée + en-tête collant : le tableau reste
+              consultable même avec beaucoup de mouvements, sans jamais
+              étirer toute la page (scroll interne uniquement). */}
           <div className="bg-white rounded-2xl border border-[#e3ebe6] p-5 overflow-x-auto">
             {data.mouvements.length === 0 ? (
               <p className="text-sm text-[#9aa8a1] py-6 text-center">Aucun mouvement sur cette période.</p>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
-                    <th className="py-2 pr-2">Date</th>
-                    <th className="py-2 pr-2">Caisse</th>
-                    <th className="py-2 pr-2">Libellé</th>
-                    <th className="py-2 pr-2">Type</th>
-                    <th className="py-2 pr-2 text-right">Montant</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.mouvements.map((m) => (
-                    <tr key={m.id} className="border-b border-[#f1f5f2]">
-                      <td className="py-2 pr-2 whitespace-nowrap">
-                        {new Date(m.date).toLocaleDateString('fr-FR')}
-                      </td>
-                      <td className="py-2 pr-2">{LABEL_CAISSE[m.caisse] || m.caisse}</td>
-                      <td className="py-2 pr-2">{m.libelle || '—'}</td>
-                      <td className="py-2 pr-2">
-                        <span
-                          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                            m.type_operation === 'Sortie' ? 'bg-[#fff1e0] text-orange' : 'bg-teal-light text-teal'
-                          }`}
-                        >
-                          {m.type_operation}
-                        </span>
-                      </td>
-                      <td className="py-2 pr-2 text-right font-semibold whitespace-nowrap">
-                        {formatFCFA(m.montant)}
-                      </td>
+              <div className="max-h-[420px] overflow-y-auto">
+                <table className="w-full text-sm min-w-[560px]">
+                  <thead className="sticky top-0 bg-white">
+                    <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
+                      <th className="py-2 pr-2">Date</th>
+                      <th className="py-2 pr-2">Caisse</th>
+                      <th className="py-2 pr-2">Libellé</th>
+                      <th className="py-2 pr-2">Type</th>
+                      <th className="py-2 pr-2 text-right">Montant</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {data.mouvements.map((m) => (
+                      <tr key={m.id} className="border-b border-[#f1f5f2]">
+                        <td className="py-2 pr-2 whitespace-nowrap">
+                          {new Date(m.date).toLocaleDateString('fr-FR')}
+                        </td>
+                        <td className="py-2 pr-2 whitespace-nowrap">{LABEL_CAISSE[m.caisse] || m.caisse}</td>
+                        <td className="py-2 pr-2 max-w-[220px] truncate" title={m.libelle || ''}>
+                          {m.libelle || '—'}
+                        </td>
+                        <td className="py-2 pr-2">
+                          <span
+                            className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                              m.type_operation === 'Sortie' ? 'bg-[#fff1e0] text-orange' : 'bg-teal-light text-teal'
+                            }`}
+                          >
+                            {m.type_operation}
+                          </span>
+                        </td>
+                        <td className="py-2 pr-2 text-right font-semibold whitespace-nowrap">
+                          {formatFCFA(m.montant)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </>
