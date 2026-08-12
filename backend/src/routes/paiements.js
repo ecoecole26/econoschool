@@ -3,6 +3,7 @@ import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { crediterCaissesParPaiement, getOrCreateCaisse, LABEL_CAISSE } from '../lib/caisse.js'
 import { calculerFrais, getReductionActive } from '../lib/frais.js'
+import { envoyerSmsEtJournaliser } from '../lib/sms.js'
 
 const router = Router()
 
@@ -96,7 +97,7 @@ router.post('/', requireAuth, async (req, res) => {
 
   const { data: eleve, error: errEleve } = await supabase
     .from('eleves')
-    .select('id, matricule')
+    .select('id, matricule, nom, tel_parent, parent')
     .eq('id', eleve_id)
     .maybeSingle()
 
@@ -167,7 +168,29 @@ router.post('/', requireAuth, async (req, res) => {
     caisseAvertissement = 'Paiement enregistré, mais le crédit des caisses a échoué.'
   }
 
-  res.json({ paiement: data, avertissement: caisseAvertissement })
+  // Le SMS au parent est un "plus" : s'il échoue (numéro manquant, passerelle
+  // injoignable...), le paiement reste valide — on renvoie juste un statut au
+  // frontend pour information, sans jamais faire échouer la requête.
+  let sms = { envoye: false, motif: null }
+  if (eleve.tel_parent) {
+    const montantFmt = new Intl.NumberFormat('fr-FR').format(montantNum)
+    const message = `${tranche_libelle ? `Paiement de ${montantFmt} F recu pour ${tranche_libelle} concernant ${eleve.nom} (${eleve.matricule}).` : `Paiement de ${montantFmt} F recu pour ${eleve.nom} (${eleve.matricule}).`} Merci.`
+
+    const resultatSms = await envoyerSmsEtJournaliser({
+      eleve_id: eleve.id,
+      matricule: eleve.matricule,
+      telephoneBrut: eleve.tel_parent,
+      message,
+      contexte: 'paiement'
+    })
+    sms = resultatSms.ok
+      ? { envoye: true, motif: null }
+      : { envoye: false, motif: resultatSms.error }
+  } else {
+    sms = { envoye: false, motif: 'Aucun numéro de parent renseigné pour cet élève' }
+  }
+
+  res.json({ paiement: data, avertissement: caisseAvertissement, sms })
 })
 
 export default router

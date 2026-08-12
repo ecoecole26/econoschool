@@ -414,8 +414,21 @@ router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res)
     const affecte = estAffecte(row.statut || row.affecte)
     // "qualite" = colonne ministérielle "Qualité" (Redoublant/NRedoublant) ; "redoublant" = fichier simplifié.
     const redoublant = estRedoublant(row.qualite || row.redoublant)
+    // Nom et téléphone du parent (colonnes ministérielles "Nom du parent" /
+    // "Téléphone 1" — utilisés pour le SMS de confirmation de paiement).
+    // Plusieurs libellés possibles selon la casse/variante du fichier fourni.
+    const parent = String(row['nom du parent'] || row.parent || row['nom parent'] || '').trim()
+    const tel_parent = String(
+      row['telephone 1'] || row['telephone1'] || row.tel_parent || row.telephone || ''
+    ).trim()
 
     const payloadCommun = { matricule, nom, classe, niveau, affecte, redoublant }
+    // On ne renseigne parent/tel_parent que s'ils sont présents dans le
+    // fichier, pour ne jamais écraser une valeur déjà en base (ex: un
+    // ré-import fait avec un fichier simplifié qui ne contient pas ces
+    // colonnes) par une valeur vide.
+    if (parent) payloadCommun.parent = parent
+    if (tel_parent) payloadCommun.tel_parent = tel_parent
 
     try {
       const { data: existant } = await supabase
