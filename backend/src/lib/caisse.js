@@ -29,6 +29,8 @@ export function roleAAccesCaisse(role, type_caisse) {
   return (ACCES_CAISSE[type_caisse] || []).includes(role)
 }
 
+export const LABEL_CAISSE = { principale: 'Caisse 1', secondaire: 'Caisse 2' }
+
 // Les sorties/retraits/dépenses sont réservés au Fondateur — l'Économe et le
 // Proviseur ne peuvent pas les exécuter.
 export function roleAAccesOperation(role, type_operation) {
@@ -122,6 +124,51 @@ export async function enregistrerMouvementCaisse({
   if (errMaj) throw new Error(errMaj.message)
 
   return { mouvement, caisse: caisseMaj }
+}
+
+// Change le statut d'une caisse (ouverte / fermee / pause) et trace qui a
+// fait l'action et quand. Retourne la caisse mise à jour.
+export async function changerStatutCaisse({ type_caisse, statut, etablissement, nom }) {
+  const caisse = await getOrCreateCaisse(type_caisse, etablissement)
+  const maintenant = new Date().toISOString()
+
+  const payload = { statut, updated_at: maintenant }
+  if (statut === 'ouverte') {
+    payload.ouverte_par = nom || null
+    payload.ouverte_le = maintenant
+  }
+  if (statut === 'fermee') {
+    payload.fermee_par = nom || null
+    payload.fermee_le = maintenant
+  }
+
+  const { data, error } = await supabase
+    .from('caisses')
+    .update(payload)
+    .eq('id', caisse.id)
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+  return data
+}
+
+// Envoie une notification en base aux rôles indiqués (sauf à l'auteur de
+// l'action lui-même). Utilisé pour prévenir le Proviseur et le Fondateur
+// quand l'Économe ouvre une caisse.
+export async function notifierRoles({ roles, etablissement, titre, message, sauf_role }) {
+  const destinataires = roles.filter((r) => r !== sauf_role)
+  if (destinataires.length === 0) return
+
+  const lignes = destinataires.map((destinataire_role) => ({
+    etablissement: etablissement || null,
+    destinataire_role,
+    titre,
+    message
+  }))
+
+  const { error } = await supabase.from('notifications').insert(lignes)
+  if (error) console.error('[notifications] erreur envoi:', error.message)
 }
 
 // Crédite automatiquement LES DEUX caisses (principale ET secondaire) lors

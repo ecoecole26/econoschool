@@ -9,6 +9,8 @@ import ImportEleves from './pages/ImportEleves.jsx'
 import Banque from './pages/Banque.jsx'
 import Paiements from './pages/Paiements.jsx'
 import Caisse from './pages/Caisse.jsx'
+import Entrees from './pages/Entrees.jsx'
+import Depenses from './pages/Depenses.jsx'
 import Reductions from './pages/Reductions.jsx'
 import Retards from './pages/Retards.jsx'
 import ProfilEleve from './pages/ProfilEleve.jsx'
@@ -16,7 +18,6 @@ import TableauDeBord from './pages/TableauDeBord.jsx'
 import Rapports from './pages/Rapports.jsx'
 import BilanPeriodique from './pages/BilanPeriodique.jsx'
 import DateButoir from './pages/DateButoir.jsx'
-import ComingSoon from './components/ComingSoon.jsx'
 
 function RequireAuth({ children }) {
   const token = localStorage.getItem('econoschool_token')
@@ -45,10 +46,8 @@ export default function App() {
       <Route path="/eleves" element={protect(<Eleves />)} />
       <Route path="/paiements" element={protect(<Paiements />)} />
       <Route path="/caisse" element={protect(<Caisse />)} />
-      <Route
-        path="/depenses"
-        element={protect(<ComingSoon title="Dépenses" icon="📤" />)}
-      />
+      <Route path="/entrees" element={protect(<Entrees />)} />
+      <Route path="/depenses" element={protect(<Depenses />)} />
       <Route path="/reductions" element={protect(<Reductions />)} />
       <Route path="/rapports" element={protect(<Rapports />)} />
       <Route path="/retards" element={protect(<Retards />)} />

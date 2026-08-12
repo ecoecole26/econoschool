@@ -5,10 +5,13 @@ import {
   TYPES_CAISSE,
   TYPE_ENCAISSEMENT,
   TYPE_SORTIE,
+  LABEL_CAISSE,
   caissesVisiblesPourRole,
   roleAAccesCaisse,
   roleAAccesOperation,
-  enregistrerMouvementCaisse
+  enregistrerMouvementCaisse,
+  changerStatutCaisse,
+  notifierRoles
 } from '../lib/caisse.js'
 
 const router = Router()
@@ -78,6 +81,17 @@ router.post('/mouvements', requireAuth, async (req, res) => {
   }
 
   try {
+    const { data: caisseActuelle } = await supabase
+      .from('caisses')
+      .select('statut')
+      .eq('type_caisse', type_caisse)
+      .maybeSingle()
+
+    if (caisseActuelle && caisseActuelle.statut !== 'ouverte') {
+      const libelleStatut = caisseActuelle.statut === 'pause' ? 'en pause' : 'fermée'
+      return res.status(409).json({ error: `Cette caisse est ${libelleStatut} : ouvrez-la avant d'enregistrer un mouvement` })
+    }
+
     const { mouvement, caisse } = await enregistrerMouvementCaisse({
       type_caisse,
       type_operation,
@@ -92,6 +106,56 @@ router.post('/mouvements', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[caisses] erreur enregistrement mouvement:', err.message)
     res.status(500).json({ error: err.message || "Erreur lors de l'enregistrement" })
+  }
+})
+
+// POST /api/caisses/:type_caisse/statut  { statut: 'ouverte' | 'fermee' | 'pause' }
+// Change l'état d'une caisse. Quand l'Économe ouvre une caisse, le Proviseur
+// et le Fondateur reçoivent une notification.
+router.post('/:type_caisse/statut', requireAuth, async (req, res) => {
+  const { type_caisse } = req.params
+  const { statut } = req.body || {}
+
+  if (!TYPES_CAISSE.includes(type_caisse)) {
+    return res.status(400).json({ error: 'Caisse invalide' })
+  }
+  if (!['ouverte', 'fermee', 'pause'].includes(statut)) {
+    return res.status(400).json({ error: 'Statut invalide' })
+  }
+  if (!roleAAccesCaisse(req.user.role, type_caisse)) {
+    return res.status(403).json({ error: "Tu n'as pas accès à cette caisse" })
+  }
+
+  try {
+    const nom = req.user.nom || req.user.role
+    const caisse = await changerStatutCaisse({
+      type_caisse,
+      statut,
+      etablissement: req.user.etablissement,
+      nom
+    })
+
+    if (statut === 'ouverte') {
+      const maintenant = new Date()
+      const dateAffichee = maintenant.toLocaleDateString('fr-FR', { timeZone: 'UTC' })
+      const heureAffichee = maintenant.toLocaleTimeString('fr-FR', {
+        timeZone: 'UTC',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+      await notifierRoles({
+        roles: ['proviseur', 'fondateur'],
+        etablissement: req.user.etablissement,
+        sauf_role: req.user.role,
+        titre: `${LABEL_CAISSE[type_caisse]} ouverte`,
+        message: `${nom} a ouvert la ${LABEL_CAISSE[type_caisse]} le ${dateAffichee} à ${heureAffichee}.`
+      })
+    }
+
+    res.json({ caisse })
+  } catch (err) {
+    console.error('[caisses] erreur changement de statut:', err.message)
+    res.status(500).json({ error: err.message || 'Erreur lors du changement de statut' })
   }
 })
 

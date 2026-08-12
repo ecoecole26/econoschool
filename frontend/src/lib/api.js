@@ -153,6 +153,20 @@ export const api = {
   getCaisses: () => request('/caisses'),
   ajouterMouvementCaisse: (payload) =>
     request('/caisses/mouvements', { method: 'POST', body: JSON.stringify(payload) }),
+  changerStatutCaisse: (type_caisse, statut) =>
+    request(`/caisses/${encodeURIComponent(type_caisse)}/statut`, {
+      method: 'POST',
+      body: JSON.stringify({ statut })
+    }),
+
+  getMouvements: (type_operation, params = {}) => {
+    const qs = new URLSearchParams({ type_operation, ...params }).toString()
+    return request(`/mouvements?${qs}`)
+  },
+
+  getNotifications: () => request('/notifications'),
+  marquerNotificationLue: (id) => request(`/notifications/${id}/lu`, { method: 'POST' }),
+  marquerToutesNotificationsLues: () => request('/notifications/tout-lire', { method: 'POST' }),
 
   getDatesButoir: () => request('/dates-butoir'),
   saveDateButoirGlobale: (date_butoir) =>
