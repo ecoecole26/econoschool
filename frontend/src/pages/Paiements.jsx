@@ -29,6 +29,7 @@ export default function Paiements() {
   const [montant, setMontant] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [smsInfo, setSmsInfo] = useState(null) // { envoye, motif } renvoyé par le backend après paiement
 
   const [etablissement, setEtablissement] = useState(null)
   const [recuOuvert, setRecuOuvert] = useState(false)
@@ -70,6 +71,7 @@ export default function Paiements() {
     setError('')
     setDonnees(null)
     setMessage('')
+    setSmsInfo(null)
     try {
       const res = await api.rechercherEleveMatricule(matricule.trim())
       setDonnees(res)
@@ -86,8 +88,9 @@ export default function Paiements() {
     if (!donnees || !montant) return
     setSaving(true)
     setMessage('')
+    setSmsInfo(null)
     try {
-      await api.enregistrerPaiement({
+      const resPaiement = await api.enregistrerPaiement({
         eleve_id: donnees.eleve.id,
         tranche_libelle: trancheChoisie || null,
         montant
@@ -104,6 +107,7 @@ export default function Paiements() {
       })
       setMontant('')
       setMessage('Paiement enregistré ✅')
+      setSmsInfo(resPaiement?.sms || null)
       chargerStatutCaisses()
     } catch (err) {
       setMessage(err.message || "Erreur lors de l'enregistrement")
@@ -321,6 +325,16 @@ export default function Paiements() {
               {message && (
                 <div className="mb-3 text-sm px-3 py-2 rounded-lg bg-teal-light text-teal inline-block">
                   {message}
+                </div>
+              )}
+
+              {smsInfo && (
+                <div
+                  className={`mb-3 text-sm px-3 py-2 rounded-lg inline-block ${
+                    smsInfo.envoye ? 'bg-teal-light text-teal' : 'bg-amber-50 text-amber-800'
+                  }`}
+                >
+                  {smsInfo.envoye ? 'SMS envoyé au parent 📩' : `SMS non envoyé : ${smsInfo.motif || 'raison inconnue'}`}
                 </div>
               )}
 
