@@ -233,13 +233,14 @@ export default function Eleves() {
         ) : (
           <table className="w-full text-sm table-fixed">
             <colgroup>
+              <col className="w-[11%]" />
+              <col className="w-[19%]" />
+              <col className="w-[8%]" />
+              <col className="w-[8%]" />
               <col className="w-[12%]" />
-              <col className="w-[24%]" />
               <col className="w-[10%]" />
               <col className="w-[10%]" />
-              <col className="w-[12%]" />
-              <col className="w-[12%]" />
-              <col className="w-[20%]" />
+              <col className="w-[22%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
@@ -250,7 +251,7 @@ export default function Eleves() {
                 <th className="py-1.5 pr-3">Contact</th>
                 <th className="py-1.5 pr-3">Statut</th>
                 <th className="py-1.5 pr-3">Qualité</th>
-                <th className="py-1.5 pr-3 text-right">Actions</th>
+                <th className="py-1.5 pl-3 pr-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -267,8 +268,8 @@ export default function Eleves() {
                   <td className="py-1.5 pr-3">
                     <Badge ok={!!el.redoublant} labelOui="Redoublant" labelNon="Non redoublant" />
                   </td>
-                  <td className="py-1.5 pr-3">
-                    <div className="flex justify-end gap-2">
+                  <td className="py-1.5 pl-3 pr-4">
+                    <div className="flex justify-end gap-2.5">
                       <IconButton
                         variant="teal"
                         title="Profil et bilan des versements"

@@ -13,7 +13,7 @@ export default function IconButton({ variant = 'teal', onClick, children, title 
       type="button"
       onClick={onClick}
       title={title}
-      className={`w-8 h-8 flex items-center justify-center rounded-lg border bg-white text-sm transition ${VARIANTS[variant]}`}
+      className={`w-9 h-9 flex items-center justify-center rounded-lg border bg-white text-base transition ${VARIANTS[variant]}`}
     >
       {children}
     </button>
