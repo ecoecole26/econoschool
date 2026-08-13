@@ -62,6 +62,16 @@ app.use('/api/mouvements', mouvementsRoutes)
 // Les prochaines routes (rapports, dépenses...) viendront ici,
 // une par une, au fur et à mesure de la reconstruction des pages.
 
+// Filet de sécurité : si une route plante sans avoir géré son erreur,
+// on répond quand même (au lieu de laisser la requête sans réponse,
+// ce qui provoque un timeout que le navigateur affiche à tort comme
+// une erreur CORS).
+app.use((err, req, res, next) => {
+  console.error('[unhandled]', err)
+  if (res.headersSent) return next(err)
+  res.status(500).json({ error: 'Erreur serveur inattendue' })
+})
+
 app.listen(PORT, () => {
   console.log(`EconoSchool backend prêt sur http://localhost:${PORT}`)
 })
