@@ -247,6 +247,7 @@ export default function Eleves() {
                 <th className="py-1.5 pr-3">Nom</th>
                 <th className="py-1.5 pr-3">Classe</th>
                 <th className="py-1.5 pr-3">Niveau</th>
+                <th className="py-1.5 pr-3">Contact</th>
                 <th className="py-1.5 pr-3">Statut</th>
                 <th className="py-1.5 pr-3">Qualité</th>
                 <th className="py-1.5 pr-3 text-right">Actions</th>
@@ -259,6 +260,7 @@ export default function Eleves() {
                   <td className="py-1.5 pr-3 truncate">{el.nom}</td>
                   <td className="py-1.5 pr-3 truncate">{el.classe}</td>
                   <td className="py-1.5 pr-3 truncate">{el.niveau || '—'}</td>
+                  <td className="py-1.5 pr-3 truncate">{el.tel_parent || '—'}</td>
                   <td className="py-1.5 pr-3">
                     <Badge ok={!!el.affecte} labelOui="Affecté" labelNon="Non affecté" />
                   </td>
@@ -293,7 +295,7 @@ export default function Eleves() {
               ))}
               {eleves.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-[#6b7d74]">
+                  <td colSpan={8} className="text-center py-10 text-[#6b7d74]">
                     Aucun élève trouvé.
                   </td>
                 </tr>

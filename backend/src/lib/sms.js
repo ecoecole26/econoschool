@@ -29,8 +29,22 @@ const ORANGE_SMS_AUTH = process.env.ORANGE_SMS_AUTH
 const ORANGE_SMS_EXPEDITEUR = process.env.ORANGE_SMS_EXPEDITEUR
 
 function formaterNumeroE164(numero) {
-  const brut = String(numero).replace(/\s/g, '')
-  return brut.startsWith('+') ? brut : `+225${brut}`
+  let brut = String(numero).replace(/\s/g, '')
+  if (brut.startsWith('+')) return brut
+
+  // Depuis la réforme de 2021, un numéro ivoirien national fait 10 chiffres
+  // (ex: 0708050658), sans 0 à retirer pour le format international
+  // (+2250708050658). Piège fréquent : Excel traite une colonne "téléphone"
+  // comme un NOMBRE et supprime le 0 de tête au moment de l'import — on se
+  // retrouve alors avec 9 chiffres au lieu de 10 (574644209 au lieu de
+  // 0574644209), ce qui donne un numéro invalide une fois +225 ajouté.
+  // On corrige ce cas précis ici, en dernier rempli avant l'envoi, pour que
+  // même les numéros déjà mal importés en base repartent correctement.
+  brut = brut.replace(/\D/g, '')
+  if (brut.length === 9) {
+    brut = `0${brut}`
+  }
+  return `+225${brut}`
 }
 
 async function envoyerSMSTraccar(numero, message) {

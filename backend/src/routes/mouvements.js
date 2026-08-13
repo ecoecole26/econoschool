@@ -36,7 +36,18 @@ router.get('/', requireAuth, async (req, res) => {
     return res.status(500).json({ error: 'Erreur lors de la lecture des mouvements' })
   }
 
-  const total = (data || []).reduce((somme, m) => somme + Number(m.montant || 0), 0)
+  // Caisse 1 (principale) reçoit une copie de chaque encaissement (contrôle
+  // anti-fraude voulu par l'établissement) : Caisse 1 et Caisse 2 montrent
+  // donc souvent le MÊME argent, pas deux sommes distinctes. Quand on
+  // regarde "Toutes les caisses" (pas de filtre précis, rôle Fondateur), on
+  // ne doit donc PAS additionner les lignes des deux caisses dans le total —
+  // ça compterait le même argent deux fois. On utilise alors uniquement les
+  // lignes de la Caisse 1 pour calculer le total (elle contient déjà tout).
+  const lignesPourTotal =
+    !caisse && typesVisibles.includes('principale')
+      ? (data || []).filter((m) => m.caisse === 'principale')
+      : data || []
+  const total = lignesPourTotal.reduce((somme, m) => somme + Number(m.montant || 0), 0)
 
   res.json({ lignes: data || [], total })
 })

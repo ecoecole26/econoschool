@@ -394,6 +394,14 @@ router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res)
   let mis_a_jour = 0
   const erreurs = []
 
+  // On prépare toutes les lignes valides d'abord (validation uniquement,
+  // pas d'appel réseau ici), puis on les envoie à Supabase par LOTS
+  // (upsert groupé) plutôt qu'une ligne à la fois. Avec 2000+ élèves,
+  // faire un aller-retour réseau par ligne (comme avant) prend plusieurs
+  // minutes et dépasse largement le temps limite d'une fonction Vercel —
+  // d'où le "Failed to fetch" silencieux. Un upsert groupé fait la même
+  // chose en quelques secondes.
+  const lignesValides = []
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
     const ligne = i + 2 // +2 : ligne 1 = en-têtes, index 0-based
@@ -418,9 +426,17 @@ router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res)
     // "Téléphone 1" — utilisés pour le SMS de confirmation de paiement).
     // Plusieurs libellés possibles selon la casse/variante du fichier fourni.
     const parent = String(row['nom du parent'] || row.parent || row['nom parent'] || '').trim()
-    const tel_parent = String(
+    // Piège Excel : une colonne "téléphone" lue comme un NOMBRE perd son 0
+    // de tête (0574644209 devient 574644209, 9 chiffres au lieu de 10).
+    // On restaure ce 0 ici, à l'import, pour que le numéro soit correct
+    // dès l'enregistrement en base (le même filet existe aussi côté envoi
+    // SMS pour les numéros déjà importés avant ce correctif).
+    let tel_parent = String(
       row['telephone 1'] || row['telephone1'] || row.tel_parent || row.telephone || ''
     ).trim()
+    if (/^\d{9}$/.test(tel_parent)) {
+      tel_parent = `0${tel_parent}`
+    }
 
     const payloadCommun = { matricule, nom, classe, niveau, affecte, redoublant }
     // On ne renseigne parent/tel_parent que s'ils sont présents dans le
@@ -430,29 +446,49 @@ router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res)
     if (parent) payloadCommun.parent = parent
     if (tel_parent) payloadCommun.tel_parent = tel_parent
 
-    try {
-      const { data: existant } = await supabase
-        .from('eleves')
-        .select('id')
-        .eq('matricule', matricule)
-        .maybeSingle()
+    lignesValides.push({ ligne, matricule, payloadCommun })
+  }
 
-      if (existant) {
-        // Mise à jour : on ne touche pas au champ "statut" (Actif/Inactif/Transféré/Exclu),
-        // qui n'a rien à voir avec la colonne "Statut" (affectation) du fichier ministériel.
-        const { error } = await supabase.from('eleves').update(payloadCommun).eq('id', existant.id)
-        if (error) throw error
-        mis_a_jour++
-      } else {
-        const { error } = await supabase
-          .from('eleves')
-          .insert({ ...payloadCommun, statut: 'Actif' })
-        if (error) throw error
-        importes++
-      }
-    } catch (err) {
-      erreurs.push(`Ligne ${ligne} (${matricule}) : ${err.message}`)
+  const TAILLE_LOT = 300
+
+  try {
+    // 1) On repère en une poignée de requêtes quels matricules existent déjà,
+    // pour distinguer créations et mises à jour (sans faire un SELECT par ligne).
+    const tousMatricules = lignesValides.map((l) => l.matricule)
+    const matriculesExistants = new Set()
+    for (let i = 0; i < tousMatricules.length; i += TAILLE_LOT) {
+      const lot = tousMatricules.slice(i, i + TAILLE_LOT)
+      const { data, error } = await supabase.from('eleves').select('matricule').in('matricule', lot)
+      if (error) throw error
+      for (const r of data || []) matriculesExistants.add(r.matricule)
     }
+
+    // 2) Upsert groupé : "statut" n'est envoyé QUE pour les nouveaux élèves
+    // (mis à 'Actif'), jamais pour une mise à jour, afin de ne jamais écraser
+    // un statut (Actif/Inactif/Transféré/Exclu) déjà changé manuellement.
+    for (let i = 0; i < lignesValides.length; i += TAILLE_LOT) {
+      const lot = lignesValides.slice(i, i + TAILLE_LOT)
+      const payloadLot = lot.map(({ matricule, payloadCommun }) => {
+        const estNouveau = !matriculesExistants.has(matricule)
+        return estNouveau ? { ...payloadCommun, statut: 'Actif' } : payloadCommun
+      })
+
+      const { error } = await supabase.from('eleves').upsert(payloadLot, { onConflict: 'matricule' })
+      if (error) {
+        for (const { ligne, matricule } of lot) {
+          erreurs.push(`Ligne ${ligne} (${matricule}) : ${error.message}`)
+        }
+        continue
+      }
+
+      for (const { matricule } of lot) {
+        if (matriculesExistants.has(matricule)) mis_a_jour++
+        else importes++
+      }
+    }
+  } catch (err) {
+    console.error('[eleves/import] erreur:', err.message)
+    return res.status(500).json({ error: `Erreur lors de l'import : ${err.message}` })
   }
 
   res.json({ importes, mis_a_jour, total_lignes: rows.length, erreurs })
