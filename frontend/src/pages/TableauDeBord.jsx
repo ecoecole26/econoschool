@@ -1,15 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
+import { Card } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
 
 function formatFCFA(n) {
   return `${Math.round(n || 0).toLocaleString('fr-FR')} FCFA`
 }
 
+function formatDateHeure(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+}
+
 export default function TableauDeBord() {
+  const navigate = useNavigate()
   const [lignes, setLignes] = useState([])
   const [resume, setResume] = useState(null)
   const [caisses, setCaisses] = useState([])
+  const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -17,10 +28,15 @@ export default function TableauDeBord() {
     setLoading(true)
     setError('')
     try {
-      const [bilan, caissesRes] = await Promise.all([api.getBilanEleves({}), api.getCaisses()])
+      const [bilan, caissesRes, notifRes] = await Promise.all([
+        api.getBilanEleves({}),
+        api.getCaisses(),
+        api.getNotifications().catch(() => ({ notifications: [] }))
+      ])
       setLignes(bilan.lignes || [])
       setResume(bilan.resume || null)
       setCaisses(caissesRes.caisses || [])
+      setNotifications(notifRes.notifications || [])
     } catch (err) {
       setError(err.message || 'Erreur lors du chargement')
     } finally {
@@ -54,13 +70,22 @@ export default function TableauDeBord() {
     return Array.from(map.values()).sort((a, b) => a.niveau.localeCompare(b.niveau))
   }, [lignes])
 
+  const totalDu = (resume?.total_paye || 0) + (resume?.total_reste || 0)
+  const tauxRecouvrement = totalDu > 0 ? ((resume?.total_paye || 0) / totalDu) * 100 : 0
+  const soldeCaisses = soldeCaisse1 + soldeCaisse2
+  const maxEffectif = Math.max(1, ...parNiveau.map((g) => g.effectif))
+
+  const activiteRecente = notifications.slice(0, 5)
+
   return (
     <Layout title="Tableau de bord">
-      <div className="mb-6">
-        <h2 className="text-2xl font-display font-bold text-vert-fonce flex items-center gap-2.5">
-          📊 Tableau de bord
-        </h2>
-        <p className="text-sm text-[#6b7d74] mt-1">Vue d'ensemble de l'établissement, en temps réel.</p>
+      <div className="mb-6 flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h2 className="text-2xl font-display font-bold text-vert-fonce flex items-center gap-2.5">
+            📊 Tableau de bord
+          </h2>
+          <p className="text-sm text-[#6b7d74] mt-1">Vue d'ensemble de l'établissement, en temps réel.</p>
+        </div>
       </div>
 
       {error && (
@@ -73,96 +98,158 @@ export default function TableauDeBord() {
         <p className="text-sm text-[#9aa8a1] py-16 text-center">Chargement…</p>
       ) : (
         <>
-          <div className="flex flex-wrap gap-3 mb-8">
-            <Carte label="Effectif total" valeur={resume?.total_eleves ?? 0} variante="orange" />
-            <Carte label="Total actifs" valeur={resume?.total_actifs ?? 0} variante="orange" />
-            <Carte label="Affectés" valeur={resume?.affectes ?? '—'} variante="blancVert" />
-            <Carte label="Non affectés" valeur={resume ? nonAffectes : '—'} variante="blancVert" />
-
-            <Carte label="Caisse 1 (principale)" valeur={formatFCFA(soldeCaisse1)} variante="vertDoux" />
-            <Carte label="Caisse 2 (secondaire)" valeur={formatFCFA(soldeCaisse2)} variante="vertDoux" />
-
-            <Carte label="Élèves en retard" valeur={resume?.en_retard ?? 0} variante="blancVert" />
-            <Carte label="Élèves ayant soldé" valeur={resume?.solde ?? 0} variante="blancVert" />
-
-            <Carte label="Somme encaissée" valeur={formatFCFA(resume?.total_paye)} variante="bleu" />
-            <Carte label="Reste à payer" valeur={formatFCFA(resume?.total_reste)} variante="bleu" />
+          {/* Rangée de KPI */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-6">
+            <Kpi
+              icone="🧑‍🎓"
+              couleur="teal"
+              label="Effectif total"
+              valeur={resume?.total_eleves ?? 0}
+              delta={`${resume?.affectes ?? 0} affectés`}
+              tendance="neutre"
+            />
+            <Kpi
+              icone="⏳"
+              couleur="amber"
+              label="Non affectés"
+              valeur={resume ? nonAffectes : 0}
+              delta={resume?.total_eleves ? `${Math.round((nonAffectes / resume.total_eleves) * 100)}% de l'effectif` : '—'}
+              tendance="neutre"
+            />
+            <Kpi
+              icone="✓"
+              couleur="violet"
+              label="Taux de recouvrement"
+              valeur={`${tauxRecouvrement.toFixed(1)}%`}
+              delta={`${formatFCFA(resume?.total_paye)} encaissés`}
+              tendance="haut"
+            />
+            <Kpi
+              icone="⚠️"
+              couleur="rose"
+              label="Reste à payer"
+              valeur={formatFCFA(resume?.total_reste)}
+              delta={`${resume?.en_retard ?? 0} élève(s) en retard`}
+              tendance="bas"
+            />
+            <Kpi
+              icone="🗃️"
+              couleur="teal"
+              label="Solde caisses"
+              valeur={formatFCFA(soldeCaisses)}
+              delta={`${resume?.solde ?? 0} élève(s) soldé(s)`}
+              tendance="neutre"
+            />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 min-w-0">
-              <h3 className="text-sm font-display font-bold text-vert-fonce mb-3">📋 Répartition par niveau</h3>
-              <div className="bg-white rounded-2xl border border-[#e3ebe6] p-4 overflow-x-auto">
-                {parNiveau.length === 0 ? (
-                  <p className="text-sm text-[#9aa8a1] py-6 text-center">Aucune donnée disponible.</p>
-                ) : (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-left text-[10px] uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
-                        <th className="py-1.5 pr-2">Niveau</th>
-                        <th className="py-1.5 pr-2 text-right">Effectif</th>
-                        <th className="py-1.5 pr-2 text-right">Affectés</th>
-                        <th className="py-1.5 pr-2 text-right">Soldés</th>
-                        <th className="py-1.5 pr-2 text-right">Total dû</th>
-                        <th className="py-1.5 pr-2 text-right">Total payé</th>
-                        <th className="py-1.5 pr-2 text-right">Reste à payer</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {parNiveau.map((g) => (
-                        <tr key={g.niveau} className="border-b border-[#f1f5f2]">
-                          <td className="py-1.5 pr-2 font-medium text-vert-fonce whitespace-nowrap">{g.niveau}</td>
-                          <td className="py-1.5 pr-2 text-right">{g.effectif}</td>
-                          <td className="py-1.5 pr-2 text-right">{g.affectes}</td>
-                          <td className="py-1.5 pr-2 text-right">{g.solde}</td>
-                          <td className="py-1.5 pr-2 text-right whitespace-nowrap">{formatFCFA(g.total_du)}</td>
-                          <td className="py-1.5 pr-2 text-right whitespace-nowrap">{formatFCFA(g.total_paye)}</td>
-                          <td className="py-1.5 pr-2 text-right font-semibold whitespace-nowrap">{formatFCFA(g.total_reste)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            {/* Répartition par niveau — mini barres */}
+            <Card title="Répartition des élèves par niveau" icon="📋" className="lg:col-span-2 min-w-0">
+              <p className="text-xs text-[#9aa8a1] -mt-2 mb-4">Effectif par niveau, tous filières confondues</p>
+              {parNiveau.length === 0 ? (
+                <p className="text-sm text-[#9aa8a1] py-6 text-center">Aucune donnée disponible.</p>
+              ) : (
+                <div className="space-y-3">
+                  {parNiveau.map((g) => (
+                    <div key={g.niveau}>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-semibold text-vert-fonce">{g.niveau}</span>
+                        <span className="text-[#6b7d74]">
+                          {g.effectif} élève{g.effectif > 1 ? 's' : ''} · {g.solde} soldé{g.solde > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="h-2.5 rounded-full bg-[#eef4f2] overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-vert-fonce"
+                          style={{ width: `${Math.max(4, (g.effectif / maxEffectif) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
 
-            <div className="min-w-0">
-              <h3 className="text-sm font-display font-bold text-vert-fonce mb-3">💰 Résumé financier</h3>
-              <div className="bg-white rounded-2xl border border-[#e3ebe6] p-4">
-                <table className="w-full text-xs">
-                  <tbody>
-                    <tr className="border-b border-[#f1f5f2]">
-                      <td className="py-2 pr-2 text-[#6b7d74]">Total dû</td>
-                      <td className="py-2 text-right font-semibold text-vert-fonce whitespace-nowrap">
-                        {formatFCFA((resume?.total_paye || 0) + (resume?.total_reste || 0))}
-                      </td>
-                    </tr>
-                    <tr className="border-b border-[#f1f5f2]">
-                      <td className="py-2 pr-2 text-[#6b7d74]">Total payé</td>
-                      <td className="py-2 text-right font-semibold text-vert-fonce whitespace-nowrap">
-                        {formatFCFA(resume?.total_paye)}
-                      </td>
-                    </tr>
-                    <tr className="border-b border-[#f1f5f2]">
-                      <td className="py-2 pr-2 text-[#6b7d74]">Reste à payer</td>
-                      <td className="py-2 text-right font-semibold text-orange whitespace-nowrap">
-                        {formatFCFA(resume?.total_reste)}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 pr-2 text-[#6b7d74]">Taux de recouvrement</td>
-                      <td className="py-2 text-right font-semibold text-vert-fonce whitespace-nowrap">
-                        {(() => {
-                          const total = (resume?.total_paye || 0) + (resume?.total_reste || 0)
-                          const taux = total > 0 ? ((resume?.total_paye || 0) / total) * 100 : 0
-                          return `${taux.toFixed(1)}%`
-                        })()}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+            {/* Résumé financier — anneau CSS */}
+            <Card title="Résumé financier" icon="💰" className="min-w-0">
+              <p className="text-xs text-[#9aa8a1] -mt-2 mb-4">Payé vs. reste à payer</p>
+              <div className="flex flex-col items-center">
+                <div
+                  className="w-36 h-36 rounded-full flex items-center justify-center"
+                  style={{
+                    background: `conic-gradient(#0b3d24 0% ${tauxRecouvrement}%, #ffe1da ${tauxRecouvrement}% 100%)`
+                  }}
+                >
+                  <div className="w-24 h-24 rounded-full bg-white flex flex-col items-center justify-center">
+                    <span className="text-lg font-display font-bold text-vert-fonce">
+                      {tauxRecouvrement.toFixed(0)}%
+                    </span>
+                    <span className="text-[10px] text-[#9aa8a1]">recouvré</span>
+                  </div>
+                </div>
+                <div className="w-full mt-5 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[#6b7d74]">
+                      <i className="w-2.5 h-2.5 rounded-full bg-vert-fonce inline-block" /> Total payé
+                    </span>
+                    <span className="font-semibold text-vert-fonce">{formatFCFA(resume?.total_paye)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[#6b7d74]">
+                      <i className="w-2.5 h-2.5 rounded-full bg-[#ffc7ba] inline-block" /> Reste à payer
+                    </span>
+                    <span className="font-semibold text-orange">{formatFCFA(resume?.total_reste)}</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-[#f1f5f2]">
+                    <span className="text-[#6b7d74]">Total dû</span>
+                    <span className="font-semibold text-vert-fonce">{formatFCFA(totalDu)}</span>
+                  </div>
+                </div>
               </div>
-            </div>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Activité récente — notifications réelles */}
+            <Card title="Activité récente" icon="🕓" className="min-w-0">
+              <p className="text-xs text-[#9aa8a1] -mt-2 mb-2">Dernières notifications de la plateforme</p>
+              {activiteRecente.length === 0 ? (
+                <p className="text-sm text-[#9aa8a1] py-6 text-center">Aucune activité récente.</p>
+              ) : (
+                <div>
+                  {activiteRecente.map((n) => (
+                    <div
+                      key={n.id}
+                      className="flex items-start justify-between gap-3 py-2.5 border-b border-[#f0f5f3] last:border-b-0 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium text-vert-fonce truncate">{n.titre}</div>
+                        <div className="text-xs text-[#6b7d74] truncate">{n.message}</div>
+                      </div>
+                      <span className="text-[10.5px] text-[#9aa8a1] whitespace-nowrap shrink-0 mt-0.5">
+                        {formatDateHeure(n.created_at)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* Accès rapides */}
+            <Card title="Accès rapides" icon="⚡" className="min-w-0">
+              <p className="text-xs text-[#9aa8a1] -mt-2 mb-3">Raccourcis vers les tâches fréquentes</p>
+              <div className="flex flex-col gap-2">
+                <AccesRapide icone="👤" label="Ajouter un élève" onClick={() => navigate('/eleves')} />
+                <AccesRapide icone="📥" label="Importer une liste d'élèves" onClick={() => navigate('/import-eleves')} />
+                <AccesRapide icone="💳" label="Enregistrer un paiement" variante="coral" onClick={() => navigate('/paiements')} />
+                <AccesRapide icone="📈" label="Voir les rapports" onClick={() => navigate('/rapports')} />
+                <AccesRapide icone="⚠️" label="Consulter les retards" onClick={() => navigate('/retards')} />
+              </div>
+            </Card>
+          </div>
+
+          <div className="mt-5 text-xs text-[#7c948e] bg-[#fbfdfc] border border-dashed border-[#d7e6e1] rounded-xl px-4 py-2.5">
+            Données en temps réel — élèves, paiements et caisses de l'établissement.
           </div>
         </>
       )}
@@ -170,24 +257,52 @@ export default function TableauDeBord() {
   )
 }
 
-const VARIANTES = {
-  neutre: { fond: 'bg-white', label: 'text-[#9aa8a1]', valeur: 'text-vert-fonce' },
-  // Effectif total / Total actifs
-  orange: { fond: 'bg-orange', label: 'text-white/85', valeur: 'text-white' },
-  // Affectés / Non affectés / Élèves en retard / Élèves ayant soldé
-  blancVert: { fond: 'bg-white', label: 'text-vert-fonce/70', valeur: 'text-vert-fonce' },
-  // Caisse 1 / Caisse 2 (vert doux, pas trop foncé)
-  vertDoux: { fond: 'bg-vert-clair', label: 'text-white/85', valeur: 'text-white' },
-  // Somme encaissée / Reste à payer
-  bleu: { fond: 'bg-bleu', label: 'text-white/85', valeur: 'text-white' }
+const KPI_COULEURS = {
+  teal: { fond: 'bg-teal-light', icone: 'text-teal' },
+  amber: { fond: 'bg-[#fff1e0]', icone: 'text-orange' },
+  violet: { fond: 'bg-purple-light', icone: 'text-purple-badge' },
+  rose: { fond: 'bg-rose-light', icone: 'text-rose' }
 }
 
-function Carte({ label, valeur, variante = 'neutre' }) {
-  const style = VARIANTES[variante] || VARIANTES.neutre
+const TENDANCE_STYLE = {
+  haut: 'text-vert-fonce',
+  bas: 'text-rose',
+  neutre: 'text-[#8a9a95]'
+}
+
+function Kpi({ icone, couleur = 'teal', label, valeur, delta, tendance = 'neutre' }) {
+  const style = KPI_COULEURS[couleur] || KPI_COULEURS.teal
   return (
-    <div className={`rounded-xl border border-[#e3ebe6] px-4 py-2.5 inline-flex flex-col ${style.fond}`}>
-      <div className={`text-[10px] font-semibold uppercase mb-0.5 whitespace-nowrap ${style.label}`}>{label}</div>
-      <div className={`text-lg font-display font-bold whitespace-nowrap ${style.valeur}`}>{valeur}</div>
+    <div className="bg-white rounded-2xl border border-[#e3ebe6] p-4">
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm mb-2.5 ${style.fond} ${style.icone}`}>
+        {icone}
+      </div>
+      <div className="text-[10.5px] font-semibold uppercase tracking-wide text-[#6b7d74]">{label}</div>
+      <div className="text-lg font-display font-bold text-vert-fonce mt-0.5 truncate">{valeur}</div>
+      {delta && <div className={`text-[11px] mt-1 font-semibold ${TENDANCE_STYLE[tendance]}`}>{delta}</div>}
     </div>
+  )
+}
+
+function AccesRapide({ icone, label, variante = 'teal', onClick }) {
+  const estCoral = variante === 'coral'
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-left transition ${
+        estCoral
+          ? 'bg-rose-light text-rose hover:bg-[#ffd7dd]'
+          : 'bg-teal-light text-teal hover:bg-[#b8ede5]'
+      }`}
+    >
+      <span
+        className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs shrink-0 ${
+          estCoral ? 'bg-rose text-white' : 'bg-teal text-white'
+        }`}
+      >
+        {icone}
+      </span>
+      {label}
+    </button>
   )
 }
