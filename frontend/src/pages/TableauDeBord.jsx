@@ -193,11 +193,11 @@ export default function TableauDeBord() {
                           />
                         ))}
                       </div>
-                      <div className="absolute inset-0 flex items-end justify-center gap-6 px-1">
+                      <div className="absolute inset-0 flex items-end justify-center gap-4 px-1">
                         {parNiveau.map((g) => (
-                          <div key={g.niveau} className="h-full w-10 flex flex-col items-center justify-end shrink-0">
+                          <div key={g.niveau} className="h-full w-12 flex flex-col items-center justify-end shrink-0">
                             <div
-                              className="w-8 rounded-t-[3px] bg-vert-fonce transition-all duration-300"
+                              className="w-10 rounded-t-[3px] bg-vert-fonce transition-all duration-300"
                               style={{ height: `${Math.max(2, (g.effectif / axisMax) * 100)}%` }}
                               title={`${g.effectif} élève${g.effectif > 1 ? 's' : ''} · ${g.solde} soldé${g.solde > 1 ? 's' : ''}`}
                             />
@@ -209,9 +209,9 @@ export default function TableauDeBord() {
                   {/* Axe des abscisses */}
                   <div className="flex gap-2 mt-2">
                     <div className="w-9 shrink-0" />
-                    <div className="flex-1 flex justify-center gap-6 px-1">
+                    <div className="flex-1 flex justify-center gap-4 px-1">
                       {parNiveau.map((g) => (
-                        <div key={g.niveau} className="w-10 flex flex-col items-center shrink-0">
+                        <div key={g.niveau} className="w-12 flex flex-col items-center shrink-0">
                           <span className="text-xs font-semibold text-vert-fonce truncate max-w-full">
                             {g.niveau}
                           </span>
@@ -294,7 +294,7 @@ export default function TableauDeBord() {
             {/* Accès rapides */}
             <Card title="Accès rapides" icon="⚡" className="min-w-0">
               <p className="text-xs text-[#9aa8a1] -mt-2 mb-3">Raccourcis vers les tâches fréquentes</p>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 <AccesRapide icone={IconeUtilisateur} label="Ajouter un élève" onClick={() => navigate('/eleves')} />
                 <AccesRapide icone={IconeImport} label="Importer une liste d'élèves" onClick={() => navigate('/import-eleves')} />
                 <AccesRapide icone={IconeCarte} label="Enregistrer un paiement" variante="coral" onClick={() => navigate('/paiements')} />
