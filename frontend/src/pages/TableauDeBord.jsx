@@ -34,28 +34,56 @@ function formatDateHeure(iso) {
   return `${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
 }
 
+function premierJourDuMois() {
+  const d = new Date()
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
+}
+
+function aujourdhuiISO() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function formatDateCourte(iso) {
+  if (!iso) return ''
+  const d = new Date(`${iso}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+}
+
+// Proportion sûre : évite les NaN quand le total vaut 0 (pas encore de mouvement).
+function pourcentageSur(valeur, total) {
+  if (!total) return 0
+  return Math.max(0, Math.min(100, (valeur / total) * 100))
+}
+
 export default function TableauDeBord() {
   const navigate = useNavigate()
   const [lignes, setLignes] = useState([])
   const [resume, setResume] = useState(null)
   const [caisses, setCaisses] = useState([])
   const [notifications, setNotifications] = useState([])
+  const [bilanPeriode, setBilanPeriode] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  const periodeDebut = useMemo(() => premierJourDuMois(), [])
+  const periodeFin = useMemo(() => aujourdhuiISO(), [])
 
   async function charger() {
     setLoading(true)
     setError('')
     try {
-      const [bilan, caissesRes, notifRes] = await Promise.all([
+      const [bilan, caissesRes, notifRes, bilanPeriodeRes] = await Promise.all([
         api.getBilanEleves({}),
         api.getCaisses(),
-        api.getNotifications().catch(() => ({ notifications: [] }))
+        api.getNotifications().catch(() => ({ notifications: [] })),
+        api.getBilanPeriodique(periodeDebut, periodeFin).catch(() => null)
       ])
       setLignes(bilan.lignes || [])
       setResume(bilan.resume || null)
       setCaisses(caissesRes.caisses || [])
       setNotifications(notifRes.notifications || [])
+      setBilanPeriode(bilanPeriodeRes || null)
     } catch (err) {
       setError(err.message || 'Erreur lors du chargement')
     } finally {
@@ -100,6 +128,17 @@ export default function TableauDeBord() {
   )
 
   const activiteRecente = notifications.slice(0, 5)
+
+  // Carte "État caisse 1 & 2" : part de chaque caisse dans le solde total.
+  const soldeCaissesTotal = soldeCaisse1 + soldeCaisse2
+  const partCaisse1 = pourcentageSur(soldeCaisse1, soldeCaissesTotal)
+
+  // Carte "Bilan périodique" : encaissements vs dépenses depuis le 1er du mois.
+  const encaissementsPeriode = bilanPeriode?.resume?.encaissements || 0
+  const depensesPeriode = bilanPeriode?.resume?.depenses || 0
+  const mouvementPeriode = encaissementsPeriode + depensesPeriode
+  const netPeriode = bilanPeriode?.resume?.net_periode ?? encaissementsPeriode - depensesPeriode
+  const partEncaissementsPeriode = pourcentageSur(encaissementsPeriode, mouvementPeriode)
 
   return (
     <Layout title="Tableau de bord">
@@ -166,25 +205,25 @@ export default function TableauDeBord() {
             />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             {/* Répartition par niveau — barres verticales */}
-            <Card title="Répartition des élèves par niveau" icon="📋" className="lg:col-span-2 min-w-0">
+            <Card title="Répartition des élèves par niveau" icon="📋" className="min-w-0">
               <p className="text-xs text-[#9aa8a1] -mt-2 mb-4">Effectif par niveau, tous filières confondues</p>
               {parNiveau.length === 0 ? (
                 <p className="text-sm text-[#9aa8a1] py-6 text-center">Aucune donnée disponible.</p>
               ) : (
                 <div className="pt-1">
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5">
                     {/* Axe des ordonnées */}
-                    <div className="w-9 shrink-0 h-48 flex flex-col justify-between text-right">
+                    <div className="w-7 shrink-0 h-44 flex flex-col justify-between text-right">
                       {yTicks.map((t) => (
-                        <span key={t} className="text-[10px] leading-none text-[#9aa8a1]">
+                        <span key={t} className="text-[9px] leading-none text-[#9aa8a1]">
                           {t.toLocaleString('fr-FR')}
                         </span>
                       ))}
                     </div>
                     {/* Zone du graphique */}
-                    <div className="flex-1 relative h-48">
+                    <div className="flex-1 relative h-44 min-w-0">
                       <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
                         {yTicks.map((t, i) => (
                           <div
@@ -193,11 +232,11 @@ export default function TableauDeBord() {
                           />
                         ))}
                       </div>
-                      <div className="absolute inset-0 flex items-end justify-center gap-4 px-1">
+                      <div className="absolute inset-0 flex items-end justify-between gap-1 px-0.5">
                         {parNiveau.map((g) => (
-                          <div key={g.niveau} className="h-full w-12 flex flex-col items-center justify-end shrink-0">
+                          <div key={g.niveau} className="h-full flex-1 flex flex-col items-center justify-end min-w-0">
                             <div
-                              className="w-10 rounded-t-[3px] bg-vert-fonce transition-all duration-300"
+                              className="w-full max-w-[26px] rounded-t-[3px] bg-vert-fonce transition-all duration-300"
                               style={{ height: `${Math.max(2, (g.effectif / axisMax) * 100)}%` }}
                               title={`${g.effectif} élève${g.effectif > 1 ? 's' : ''} · ${g.solde} soldé${g.solde > 1 ? 's' : ''}`}
                             />
@@ -207,12 +246,12 @@ export default function TableauDeBord() {
                     </div>
                   </div>
                   {/* Axe des abscisses */}
-                  <div className="flex gap-2 mt-2">
-                    <div className="w-9 shrink-0" />
-                    <div className="flex-1 flex justify-center gap-4 px-1">
+                  <div className="flex gap-1.5 mt-2">
+                    <div className="w-7 shrink-0" />
+                    <div className="flex-1 flex justify-between gap-1 px-0.5 min-w-0">
                       {parNiveau.map((g) => (
-                        <div key={g.niveau} className="w-12 flex flex-col items-center shrink-0">
-                          <span className="text-xs font-semibold text-vert-fonce truncate max-w-full">
+                        <div key={g.niveau} className="flex-1 flex flex-col items-center min-w-0">
+                          <span className="text-[10.5px] font-semibold text-vert-fonce truncate max-w-full">
                             {g.niveau}
                           </span>
                           <span className="text-[10px] text-[#9aa8a1] truncate max-w-full">
@@ -226,21 +265,101 @@ export default function TableauDeBord() {
               )}
             </Card>
 
-            {/* Résumé financier — anneau CSS */}
+            {/* État caisse 1 & 2 — anneau orange / vert */}
+            <Card title="État caisse 1 & 2" icon="🗃️" className="min-w-0">
+              <p className="text-xs text-[#9aa8a1] -mt-2 mb-4">Solde actuel de chaque caisse</p>
+              <div className="flex flex-col items-center">
+                <div
+                  className="w-32 h-32 rounded-full flex items-center justify-center"
+                  style={{
+                    background: `conic-gradient(#0b3d24 0% ${partCaisse1}%, #e8871e ${partCaisse1}% 100%)`
+                  }}
+                >
+                  <div className="w-20 h-20 rounded-full bg-white flex flex-col items-center justify-center">
+                    <span className="text-base font-display font-bold text-vert-fonce">
+                      {partCaisse1.toFixed(0)}%
+                    </span>
+                    <span className="text-[10.5px] text-[#9aa8a1] text-center leading-tight">en Caisse 1</span>
+                  </div>
+                </div>
+                <div className="w-full mt-5 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[#6b7d74]">
+                      <i className="w-2.5 h-2.5 rounded-full bg-vert-fonce inline-block" /> Caisse 1 (principale)
+                    </span>
+                    <span className="font-semibold text-vert-fonce">{formatFCFA(soldeCaisse1)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[#6b7d74]">
+                      <i className="w-2.5 h-2.5 rounded-full bg-orange inline-block" /> Caisse 2 (secondaire)
+                    </span>
+                    <span className="font-semibold text-orange">{formatFCFA(soldeCaisse2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-[#f1f5f2]">
+                    <span className="text-[#6b7d74]">Solde total</span>
+                    <span className="font-semibold text-vert-fonce">{formatFCFA(soldeCaissesTotal)}</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Bilan périodique — anneau vert (encaissements) / rouge (dépenses), mois en cours */}
+            <Card title="Bilan périodique" icon="🧭" className="min-w-0">
+              <p className="text-xs text-[#9aa8a1] -mt-2 mb-4">
+                Du {formatDateCourte(periodeDebut)} au {formatDateCourte(periodeFin)}
+              </p>
+              <div className="flex flex-col items-center">
+                <div
+                  className="w-32 h-32 rounded-full flex items-center justify-center"
+                  style={{
+                    background: `conic-gradient(#0b3d24 0% ${partEncaissementsPeriode}%, #f43f5e ${partEncaissementsPeriode}% 100%)`
+                  }}
+                >
+                  <div className="w-20 h-20 rounded-full bg-white flex flex-col items-center justify-center">
+                    <span className="text-base font-display font-bold text-vert-fonce">
+                      {partEncaissementsPeriode.toFixed(0)}%
+                    </span>
+                    <span className="text-[10.5px] text-[#9aa8a1] text-center leading-tight">encaissé</span>
+                  </div>
+                </div>
+                <div className="w-full mt-5 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[#6b7d74]">
+                      <i className="w-2.5 h-2.5 rounded-full bg-vert-fonce inline-block" /> Encaissements
+                    </span>
+                    <span className="font-semibold text-vert-fonce">{formatFCFA(encaissementsPeriode)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[#6b7d74]">
+                      <i className="w-2.5 h-2.5 rounded-full bg-rose inline-block" /> Dépenses
+                    </span>
+                    <span className="font-semibold text-rose">{formatFCFA(depensesPeriode)}</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-[#f1f5f2]">
+                    <span className="text-[#6b7d74]">Net période</span>
+                    <span className={`font-semibold ${netPeriode >= 0 ? 'text-vert-fonce' : 'text-rose'}`}>
+                      {formatFCFA(netPeriode)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Résumé financier — anneau vert / corail */}
             <Card title="Résumé financier" icon="💰" className="min-w-0">
               <p className="text-xs text-[#9aa8a1] -mt-2 mb-4">Payé vs. reste à payer</p>
               <div className="flex flex-col items-center">
                 <div
-                  className="w-52 h-52 rounded-full flex items-center justify-center"
+                  className="w-32 h-32 rounded-full flex items-center justify-center"
                   style={{
                     background: `conic-gradient(#0b3d24 0% ${tauxRecouvrement}%, #ffe1da ${tauxRecouvrement}% 100%)`
                   }}
                 >
-                  <div className="w-36 h-36 rounded-full bg-white flex flex-col items-center justify-center">
-                    <span className="text-2xl font-display font-bold text-vert-fonce">
+                  <div className="w-20 h-20 rounded-full bg-white flex flex-col items-center justify-center">
+                    <span className="text-base font-display font-bold text-vert-fonce">
                       {tauxRecouvrement.toFixed(0)}%
                     </span>
-                    <span className="text-[11px] text-[#9aa8a1]">recouvré</span>
+                    <span className="text-[10.5px] text-[#9aa8a1]">recouvré</span>
                   </div>
                 </div>
                 <div className="w-full mt-5 space-y-2 text-xs">
