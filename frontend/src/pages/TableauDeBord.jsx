@@ -143,27 +143,29 @@ export default function TableauDeBord() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-            {/* Répartition par niveau — mini barres */}
+            {/* Répartition par niveau — barres verticales */}
             <Card title="Répartition des élèves par niveau" icon="📋" className="lg:col-span-2 min-w-0">
               <p className="text-xs text-[#9aa8a1] -mt-2 mb-4">Effectif par niveau, tous filières confondues</p>
               {parNiveau.length === 0 ? (
                 <p className="text-sm text-[#9aa8a1] py-6 text-center">Aucune donnée disponible.</p>
               ) : (
-                <div className="space-y-3">
+                <div className="flex items-end justify-between gap-3 h-52 pt-2">
                   {parNiveau.map((g) => (
-                    <div key={g.niveau}>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-semibold text-vert-fonce">{g.niveau}</span>
-                        <span className="text-[#6b7d74]">
-                          {g.effectif} élève{g.effectif > 1 ? 's' : ''} · {g.solde} soldé{g.solde > 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      <div className="h-2.5 rounded-full bg-[#eef4f2] overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-vert-fonce"
-                          style={{ width: `${Math.max(4, (g.effectif / maxEffectif) * 100)}%` }}
-                        />
-                      </div>
+                    <div key={g.niveau} className="flex-1 h-full flex flex-col items-center justify-end min-w-0">
+                      <span className="text-[11px] font-semibold text-vert-fonce mb-1.5 whitespace-nowrap">
+                        {g.effectif}
+                      </span>
+                      <div
+                        className="w-full max-w-[52px] rounded-t-lg bg-vert-fonce transition-all duration-300"
+                        style={{ height: `${Math.max(4, (g.effectif / maxEffectif) * 100)}%` }}
+                        title={`${g.effectif} élève${g.effectif > 1 ? 's' : ''} · ${g.solde} soldé${g.solde > 1 ? 's' : ''}`}
+                      />
+                      <span className="text-xs font-semibold text-vert-fonce mt-2 truncate max-w-full">
+                        {g.niveau}
+                      </span>
+                      <span className="text-[10px] text-[#9aa8a1] truncate max-w-full">
+                        {g.solde} soldé{g.solde > 1 ? 's' : ''}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -175,16 +177,16 @@ export default function TableauDeBord() {
               <p className="text-xs text-[#9aa8a1] -mt-2 mb-4">Payé vs. reste à payer</p>
               <div className="flex flex-col items-center">
                 <div
-                  className="w-36 h-36 rounded-full flex items-center justify-center"
+                  className="w-52 h-52 rounded-full flex items-center justify-center"
                   style={{
                     background: `conic-gradient(#0b3d24 0% ${tauxRecouvrement}%, #ffe1da ${tauxRecouvrement}% 100%)`
                   }}
                 >
-                  <div className="w-24 h-24 rounded-full bg-white flex flex-col items-center justify-center">
-                    <span className="text-lg font-display font-bold text-vert-fonce">
+                  <div className="w-36 h-36 rounded-full bg-white flex flex-col items-center justify-center">
+                    <span className="text-2xl font-display font-bold text-vert-fonce">
                       {tauxRecouvrement.toFixed(0)}%
                     </span>
-                    <span className="text-[10px] text-[#9aa8a1]">recouvré</span>
+                    <span className="text-[11px] text-[#9aa8a1]">recouvré</span>
                   </div>
                 </div>
                 <div className="w-full mt-5 space-y-2 text-xs">
@@ -289,15 +291,15 @@ function AccesRapide({ icone, label, variante = 'teal', onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-left transition ${
+      className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-left border transition ${
         estCoral
-          ? 'bg-rose-light text-rose hover:bg-[#ffd7dd]'
-          : 'bg-teal-light text-teal hover:bg-[#b8ede5]'
+          ? 'bg-[#fff5f3] border-[#ffdbd2] text-rose hover:bg-[#ffe9e4]'
+          : 'bg-[#f2fbf9] border-[#c9ede6] text-teal hover:bg-[#e3f6f1]'
       }`}
     >
       <span
-        className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs shrink-0 ${
-          estCoral ? 'bg-rose text-white' : 'bg-teal text-white'
+        className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs text-white shrink-0 ${
+          estCoral ? 'bg-rose' : 'bg-teal'
         }`}
       >
         {icone}
