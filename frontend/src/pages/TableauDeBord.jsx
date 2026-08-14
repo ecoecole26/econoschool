@@ -8,6 +8,25 @@ function formatFCFA(n) {
   return `${Math.round(n || 0).toLocaleString('fr-FR')} FCFA`
 }
 
+function arrondirPasAxe(valeur) {
+  if (valeur <= 0) return 10
+  const magnitude = Math.pow(10, Math.floor(Math.log10(valeur)))
+  const residu = valeur / magnitude
+  let nice
+  if (residu <= 1) nice = 1
+  else if (residu <= 1.5) nice = 1.5
+  else if (residu <= 2) nice = 2
+  else if (residu <= 2.5) nice = 2.5
+  else if (residu <= 5) nice = 5
+  else nice = 10
+  return nice * magnitude
+}
+
+function calculerAxeY(maxValeur) {
+  const step = arrondirPasAxe(maxValeur / 3)
+  return { max: step * 3, step }
+}
+
 function formatDateHeure(iso) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -74,6 +93,11 @@ export default function TableauDeBord() {
   const tauxRecouvrement = totalDu > 0 ? ((resume?.total_paye || 0) / totalDu) * 100 : 0
   const soldeCaisses = soldeCaisse1 + soldeCaisse2
   const maxEffectif = Math.max(1, ...parNiveau.map((g) => g.effectif))
+  const { max: axisMax, step: axisStep } = useMemo(() => calculerAxeY(maxEffectif), [maxEffectif])
+  const yTicks = useMemo(
+    () => [axisMax, axisMax - axisStep, axisMax - axisStep * 2, 0],
+    [axisMax, axisStep]
+  )
 
   const activiteRecente = notifications.slice(0, 5)
 
@@ -149,25 +173,55 @@ export default function TableauDeBord() {
               {parNiveau.length === 0 ? (
                 <p className="text-sm text-[#9aa8a1] py-6 text-center">Aucune donnée disponible.</p>
               ) : (
-                <div className="flex items-end justify-between gap-3 h-52 pt-2">
-                  {parNiveau.map((g) => (
-                    <div key={g.niveau} className="flex-1 h-full flex flex-col items-center justify-end min-w-0">
-                      <span className="text-[11px] font-semibold text-vert-fonce mb-1.5 whitespace-nowrap">
-                        {g.effectif}
-                      </span>
-                      <div
-                        className="w-full max-w-[52px] rounded-t-lg bg-vert-fonce transition-all duration-300"
-                        style={{ height: `${Math.max(4, (g.effectif / maxEffectif) * 100)}%` }}
-                        title={`${g.effectif} élève${g.effectif > 1 ? 's' : ''} · ${g.solde} soldé${g.solde > 1 ? 's' : ''}`}
-                      />
-                      <span className="text-xs font-semibold text-vert-fonce mt-2 truncate max-w-full">
-                        {g.niveau}
-                      </span>
-                      <span className="text-[10px] text-[#9aa8a1] truncate max-w-full">
-                        {g.solde} soldé{g.solde > 1 ? 's' : ''}
-                      </span>
+                <div className="pt-1">
+                  <div className="flex gap-2">
+                    {/* Axe des ordonnées */}
+                    <div className="w-9 shrink-0 h-48 flex flex-col justify-between text-right">
+                      {yTicks.map((t) => (
+                        <span key={t} className="text-[10px] leading-none text-[#9aa8a1]">
+                          {t.toLocaleString('fr-FR')}
+                        </span>
+                      ))}
                     </div>
-                  ))}
+                    {/* Zone du graphique */}
+                    <div className="flex-1 relative h-48">
+                      <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                        {yTicks.map((t, i) => (
+                          <div
+                            key={t}
+                            className={`w-full h-0 border-t ${i === yTicks.length - 1 ? 'border-[#d7e6e1]' : 'border-[#eef2f0]'}`}
+                          />
+                        ))}
+                      </div>
+                      <div className="absolute inset-0 flex items-end justify-center gap-6 px-1">
+                        {parNiveau.map((g) => (
+                          <div key={g.niveau} className="h-full w-10 flex flex-col items-center justify-end shrink-0">
+                            <div
+                              className="w-8 rounded-t-[3px] bg-vert-fonce transition-all duration-300"
+                              style={{ height: `${Math.max(2, (g.effectif / axisMax) * 100)}%` }}
+                              title={`${g.effectif} élève${g.effectif > 1 ? 's' : ''} · ${g.solde} soldé${g.solde > 1 ? 's' : ''}`}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Axe des abscisses */}
+                  <div className="flex gap-2 mt-2">
+                    <div className="w-9 shrink-0" />
+                    <div className="flex-1 flex justify-center gap-6 px-1">
+                      {parNiveau.map((g) => (
+                        <div key={g.niveau} className="w-10 flex flex-col items-center shrink-0">
+                          <span className="text-xs font-semibold text-vert-fonce truncate max-w-full">
+                            {g.niveau}
+                          </span>
+                          <span className="text-[10px] text-[#9aa8a1] truncate max-w-full">
+                            {g.solde} soldé{g.solde > 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </Card>
@@ -241,11 +295,11 @@ export default function TableauDeBord() {
             <Card title="Accès rapides" icon="⚡" className="min-w-0">
               <p className="text-xs text-[#9aa8a1] -mt-2 mb-3">Raccourcis vers les tâches fréquentes</p>
               <div className="flex flex-col gap-2">
-                <AccesRapide icone="👤" label="Ajouter un élève" onClick={() => navigate('/eleves')} />
-                <AccesRapide icone="📥" label="Importer une liste d'élèves" onClick={() => navigate('/import-eleves')} />
-                <AccesRapide icone="💳" label="Enregistrer un paiement" variante="coral" onClick={() => navigate('/paiements')} />
-                <AccesRapide icone="📈" label="Voir les rapports" onClick={() => navigate('/rapports')} />
-                <AccesRapide icone="⚠️" label="Consulter les retards" onClick={() => navigate('/retards')} />
+                <AccesRapide icone={IconeUtilisateur} label="Ajouter un élève" onClick={() => navigate('/eleves')} />
+                <AccesRapide icone={IconeImport} label="Importer une liste d'élèves" onClick={() => navigate('/import-eleves')} />
+                <AccesRapide icone={IconeCarte} label="Enregistrer un paiement" variante="coral" onClick={() => navigate('/paiements')} />
+                <AccesRapide icone={IconeGraphique} label="Voir les rapports" onClick={() => navigate('/rapports')} />
+                <AccesRapide icone={IconeAlerte} label="Consulter les retards" onClick={() => navigate('/retards')} />
               </div>
             </Card>
           </div>
@@ -286,7 +340,7 @@ function Kpi({ icone, couleur = 'teal', label, valeur, delta, tendance = 'neutre
   )
 }
 
-function AccesRapide({ icone, label, variante = 'teal', onClick }) {
+function AccesRapide({ icone: Icone, label, variante = 'teal', onClick }) {
   const estCoral = variante === 'coral'
   return (
     <button
@@ -298,13 +352,63 @@ function AccesRapide({ icone, label, variante = 'teal', onClick }) {
       }`}
     >
       <span
-        className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs text-white shrink-0 ${
+        className={`w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0 ${
           estCoral ? 'bg-rose' : 'bg-teal'
         }`}
       >
-        {icone}
+        <Icone className="w-3.5 h-3.5" />
       </span>
       {label}
     </button>
+  )
+}
+
+function IconeUtilisateur({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-1.5a5 5 0 0 0-5-5H9a5 5 0 0 0-5 5V21" />
+      <circle cx="12" cy="7.5" r="4" />
+    </svg>
+  )
+}
+
+function IconeImport({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v12" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M4 21h16" />
+    </svg>
+  )
+}
+
+function IconeCarte({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2.5" y="5.5" width="19" height="13" rx="2" />
+      <path d="M2.5 10h19" />
+      <path d="M6 14.5h4" />
+    </svg>
+  )
+}
+
+function IconeGraphique({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 20V10" />
+      <path d="M12 20V4" />
+      <path d="M20 20v-6" />
+      <path d="M3 20h18" />
+    </svg>
+  )
+}
+
+function IconeAlerte({ className = '' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.3 4.3 2.6 18a1.6 1.6 0 0 0 1.4 2.4h16a1.6 1.6 0 0 0 1.4-2.4L13.7 4.3a1.6 1.6 0 0 0-2.8 0Z" />
+      <path d="M12 9.5v4" />
+      <path d="M12 17h.01" />
+    </svg>
   )
 }
