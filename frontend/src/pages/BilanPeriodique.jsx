@@ -4,7 +4,7 @@ import PageHeader from '../components/PageHeader.jsx'
 import { Card, Field, TextInput } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
 
-const LABEL_CAISSE = { principale: 'Caisse 1 (principale)', secondaire: 'Caisse 2 (secondaire)' }
+const LABEL_CAISSE = { principale: 'Caisse' }
 
 function formatFCFA(n) {
   return `${Math.round(n || 0).toLocaleString('fr-FR')} FCFA`
@@ -88,8 +88,8 @@ export default function BilanPeriodique() {
             <Carte label="Solde actuel (total)" valeur={formatFCFA(data.resume.solde_actuel_total)} variante="bleu" />
           </div>
 
-          <h3 className="text-sm font-display font-bold text-vert-fonce mb-3">🏦 Détail par caisse</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <h3 className="text-sm font-display font-bold text-vert-fonce mb-3">🏦 Détail de la caisse</h3>
+          <div className="grid grid-cols-1 md:max-w-sm gap-4 mb-6">
             {Object.entries(data.parCaisse).map(([type, c]) => (
               <Card key={type} title={LABEL_CAISSE[type] || type}>
                 <div className="space-y-2 text-sm">
@@ -125,7 +125,6 @@ export default function BilanPeriodique() {
                   <thead className="sticky top-0 bg-white">
                     <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
                       <th className="py-2 pr-2">Date</th>
-                      <th className="py-2 pr-2">Caisse</th>
                       <th className="py-2 pr-2">Libellé</th>
                       <th className="py-2 pr-2">Type</th>
                       <th className="py-2 pr-2 text-right">Montant</th>
@@ -137,7 +136,6 @@ export default function BilanPeriodique() {
                         <td className="py-2 pr-2 whitespace-nowrap">
                           {new Date(m.date).toLocaleDateString('fr-FR')}
                         </td>
-                        <td className="py-2 pr-2 whitespace-nowrap">{LABEL_CAISSE[m.caisse] || m.caisse}</td>
                         <td className="py-2 pr-2 max-w-[220px] truncate" title={m.libelle || ''}>
                           {m.libelle || '—'}
                         </td>

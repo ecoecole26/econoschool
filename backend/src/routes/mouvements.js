@@ -10,7 +10,7 @@ const router = Router()
 // mouvements du journal_caisse filtrés par type, avec le total sur la
 // période/le filtre demandé.
 router.get('/', requireAuth, async (req, res) => {
-  const { type_operation, caisse = '', date_debut = '', date_fin = '' } = req.query || {}
+  const { type_operation, date_debut = '', date_fin = '' } = req.query || {}
 
   if (![TYPE_ENCAISSEMENT, TYPE_SORTIE].includes(type_operation)) {
     return res.status(400).json({ error: "Paramètre type_operation invalide (Encaissement ou Sortie)" })
@@ -25,7 +25,6 @@ router.get('/', requireAuth, async (req, res) => {
     .in('caisse', typesVisibles)
     .order('date', { ascending: false })
 
-  if (caisse && typesVisibles.includes(caisse)) q = q.eq('caisse', caisse)
   if (date_debut) q = q.gte('date', `${date_debut}T00:00:00`)
   if (date_fin) q = q.lte('date', `${date_fin}T23:59:59`)
 
@@ -36,18 +35,7 @@ router.get('/', requireAuth, async (req, res) => {
     return res.status(500).json({ error: 'Erreur lors de la lecture des mouvements' })
   }
 
-  // Caisse 1 (principale) reçoit une copie de chaque encaissement (contrôle
-  // anti-fraude voulu par l'établissement) : Caisse 1 et Caisse 2 montrent
-  // donc souvent le MÊME argent, pas deux sommes distinctes. Quand on
-  // regarde "Toutes les caisses" (pas de filtre précis, rôle Fondateur), on
-  // ne doit donc PAS additionner les lignes des deux caisses dans le total —
-  // ça compterait le même argent deux fois. On utilise alors uniquement les
-  // lignes de la Caisse 1 pour calculer le total (elle contient déjà tout).
-  const lignesPourTotal =
-    !caisse && typesVisibles.includes('principale')
-      ? (data || []).filter((m) => m.caisse === 'principale')
-      : data || []
-  const total = lignesPourTotal.reduce((somme, m) => somme + Number(m.montant || 0), 0)
+  const total = (data || []).reduce((somme, m) => somme + Number(m.montant || 0), 0)
 
   res.json({ lignes: data || [], total })
 })

@@ -95,8 +95,8 @@ export default function TableauDeBord() {
     charger()
   }, [])
 
-  const soldeCaisse1 = caisses.find((c) => c.type_caisse === 'principale')?.solde || 0
-  const soldeCaisse2 = caisses.find((c) => c.type_caisse === 'secondaire')?.solde || 0
+  const caissePrincipale = caisses.find((c) => c.type_caisse === 'principale') || null
+  const soldeCaisse = caissePrincipale?.solde || 0
   const nonAffectes = resume ? resume.total_eleves - (resume.affectes ?? 0) : 0
 
   const parNiveau = useMemo(() => {
@@ -119,7 +119,6 @@ export default function TableauDeBord() {
 
   const totalDu = (resume?.total_paye || 0) + (resume?.total_reste || 0)
   const tauxRecouvrement = totalDu > 0 ? ((resume?.total_paye || 0) / totalDu) * 100 : 0
-  const soldeCaisses = soldeCaisse1 + soldeCaisse2
   const maxEffectif = Math.max(1, ...parNiveau.map((g) => g.effectif))
   const { max: axisMax, step: axisStep } = useMemo(() => calculerAxeY(maxEffectif), [maxEffectif])
   const yTicks = useMemo(
@@ -128,10 +127,6 @@ export default function TableauDeBord() {
   )
 
   const activiteRecente = notifications.slice(0, 5)
-
-  // Carte "État caisse 1 & 2" : part de chaque caisse dans le solde total.
-  const soldeCaissesTotal = soldeCaisse1 + soldeCaisse2
-  const partCaisse1 = pourcentageSur(soldeCaisse1, soldeCaissesTotal)
 
   // Carte "Bilan périodique" : encaissements vs dépenses depuis le 1er du mois.
   const encaissementsPeriode = bilanPeriode?.resume?.encaissements || 0
@@ -198,8 +193,8 @@ export default function TableauDeBord() {
             <Kpi
               icone="🗃️"
               couleur="teal"
-              label="Solde caisses"
-              valeur={formatFCFA(soldeCaisses)}
+              label="Solde caisse"
+              valeur={formatFCFA(soldeCaisse)}
               delta={`${resume?.solde ?? 0} élève(s) soldé(s)`}
               tendance="neutre"
             />
@@ -265,40 +260,45 @@ export default function TableauDeBord() {
               )}
             </Card>
 
-            {/* État caisse 1 & 2 — anneau orange / vert */}
-            <Card title="État caisse 1 & 2" icon="🗃️" className="min-w-0">
-              <p className="text-xs text-[#9aa8a1] -mt-2 mb-4">Solde actuel de chaque caisse</p>
+            {/* État de la caisse — solde et statut */}
+            <Card title="État de la caisse" icon="🗃️" className="min-w-0">
+              <p className="text-xs text-[#9aa8a1] -mt-2 mb-4">Solde actuel et statut</p>
               <div className="flex flex-col items-center">
-                <div
-                  className="w-32 h-32 rounded-full flex items-center justify-center"
-                  style={{
-                    background: `conic-gradient(#0b3d24 0% ${partCaisse1}%, #e8871e ${partCaisse1}% 100%)`
-                  }}
-                >
-                  <div className="w-20 h-20 rounded-full bg-white flex flex-col items-center justify-center">
-                    <span className="text-base font-display font-bold text-vert-fonce">
-                      {partCaisse1.toFixed(0)}%
-                    </span>
-                    <span className="text-[10.5px] text-[#9aa8a1] text-center leading-tight">en Caisse 1</span>
-                  </div>
+                <div className="w-32 h-32 rounded-full bg-[#f2f8f5] flex flex-col items-center justify-center">
+                  <span className="text-2xl font-display font-bold text-vert-fonce text-center leading-tight px-2">
+                    {formatFCFA(soldeCaisse)}
+                  </span>
+                  <span className="text-[10.5px] text-[#9aa8a1] mt-1">solde actuel</span>
                 </div>
                 <div className="w-full mt-5 space-y-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-[#6b7d74]">
-                      <i className="w-2.5 h-2.5 rounded-full bg-vert-fonce inline-block" /> Caisse 1 (principale)
+                    <span className="text-[#6b7d74]">Statut</span>
+                    <span
+                      className={`font-semibold px-2 py-0.5 rounded-full text-[11px] ${
+                        caissePrincipale?.statut === 'ouverte'
+                          ? 'bg-teal-light text-teal'
+                          : caissePrincipale?.statut === 'pause'
+                          ? 'bg-orange-clair/20 text-orange'
+                          : 'bg-[#f1f5f2] text-[#6b7d74]'
+                      }`}
+                    >
+                      {caissePrincipale?.statut === 'ouverte'
+                        ? 'Ouverte'
+                        : caissePrincipale?.statut === 'pause'
+                        ? 'En pause'
+                        : caissePrincipale?.statut === 'fermee'
+                        ? 'Fermée'
+                        : 'Pas encore ouverte'}
                     </span>
-                    <span className="font-semibold text-vert-fonce">{formatFCFA(soldeCaisse1)}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-[#6b7d74]">
-                      <i className="w-2.5 h-2.5 rounded-full bg-orange inline-block" /> Caisse 2 (secondaire)
-                    </span>
-                    <span className="font-semibold text-orange">{formatFCFA(soldeCaisse2)}</span>
-                  </div>
-                  <div className="flex items-center justify-between pt-2 border-t border-[#f1f5f2]">
-                    <span className="text-[#6b7d74]">Solde total</span>
-                    <span className="font-semibold text-vert-fonce">{formatFCFA(soldeCaissesTotal)}</span>
-                  </div>
+                  {caissePrincipale?.ouverte_par && (
+                    <div className="flex items-center justify-between pt-2 border-t border-[#f1f5f2]">
+                      <span className="text-[#6b7d74]">Ouverte par</span>
+                      <span className="font-semibold text-vert-fonce truncate max-w-[140px]" title={caissePrincipale.ouverte_par}>
+                        {caissePrincipale.ouverte_par}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>

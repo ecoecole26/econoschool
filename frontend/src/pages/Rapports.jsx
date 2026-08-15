@@ -66,8 +66,7 @@ export default function Rapports() {
     return Array.from(map.values()).sort((a, b) => a.niveau.localeCompare(b.niveau))
   }, [lignes])
 
-  const soldeCaisse1 = caisses.find((c) => c.type_caisse === 'principale')?.solde || 0
-  const soldeCaisse2 = caisses.find((c) => c.type_caisse === 'secondaire')?.solde || 0
+  const soldeCaisse = caisses.find((c) => c.type_caisse === 'principale')?.solde || 0
 
   const tauxRecouvrement = resume?.total_du
     ? `${Math.round((resume.total_paye / resume.total_du) * 100)}%`
@@ -89,8 +88,7 @@ export default function Rapports() {
   ]
 
   const lignesCaisses = [
-    { label: 'Caisse 1 (principale)', valeur: formatFCFA(soldeCaisse1), accent: true },
-    { label: 'Caisse 2 (secondaire)', valeur: formatFCFA(soldeCaisse2), accent: true }
+    { label: 'Caisse', valeur: formatFCFA(soldeCaisse), accent: true }
   ]
 
   async function handleExporter() {

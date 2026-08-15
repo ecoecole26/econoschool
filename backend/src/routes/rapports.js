@@ -7,7 +7,7 @@ import { TYPES_CAISSE, caissesVisiblesPourRole } from '../lib/caisse.js'
 
 const router = Router()
 
-const LABEL_CAISSE = { principale: 'Caisse 1 (principale)', secondaire: 'Caisse 2 (secondaire)' }
+const LABEL_CAISSE = { principale: 'Caisse' }
 
 function feuilleAvecLargeurs(aoa, largeurs) {
   const feuille = XLSX.utils.aoa_to_sheet(aoa)
@@ -60,8 +60,6 @@ router.get('/export', requireAuth, async (req, res) => {
 
     const affectes = lignes.filter((l) => l.affecte).length
     const nonAffectes = lignes.length - affectes
-    const soldeCaisse1 = caisses.find((c) => c.type_caisse === 'principale')?.solde || 0
-    const soldeCaisse2 = caisses.find((c) => c.type_caisse === 'secondaire')?.solde || 0
     const tauxRecouvrement = resume.total_du ? Math.round((resume.total_paye / resume.total_du) * 100) : null
 
     const workbook = XLSX.utils.book_new()

@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
 import Layout from '../components/Layout.jsx'
 import PageHeader from '../components/PageHeader.jsx'
-import { Card, Field, Select, TextInput } from '../components/ui.jsx'
+import { Card, Field, TextInput } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
-
-const LABEL_CAISSE = { principale: 'Caisse 1', secondaire: 'Caisse 2' }
 
 function formatFCFA(n) {
   return `${Math.round(n || 0).toLocaleString('fr-FR')} F`
@@ -20,10 +18,9 @@ function formatDateHeure(valeur) {
 }
 
 function exporterCSV(lignes, nomFichier) {
-  const entetes = ['Date', 'Caisse', 'Libellé', 'Montant', 'Par']
+  const entetes = ['Date', 'Libellé', 'Montant', 'Par']
   const rangees = lignes.map((m) => [
     formatDateHeure(m.date),
-    LABEL_CAISSE[m.caisse] || m.caisse,
     m.libelle || '',
     m.montant,
     m.valide_par || m.demande_par || ''
@@ -45,10 +42,6 @@ function exporterCSV(lignes, nomFichier) {
 // Composant générique réutilisé par Entrées et Dépenses : seul le type
 // d'opération (et le texte/icône) change entre les deux pages.
 export function ListeMouvements({ typeOperation, icone, titre, sousTitre, couleurTotal, nomFichier }) {
-  const role = localStorage.getItem('econoschool_role')
-  const caissesDisponibles = role === 'fondateur' ? ['principale', 'secondaire'] : ['secondaire']
-
-  const [caisse, setCaisse] = useState('')
   const [dateDebut, setDateDebut] = useState('')
   const [dateFin, setDateFin] = useState('')
   const [lignes, setLignes] = useState([])
@@ -60,7 +53,6 @@ export function ListeMouvements({ typeOperation, icone, titre, sousTitre, couleu
     setLoading(true)
     setError('')
     const params = {}
-    if (caisse) params.caisse = caisse
     if (dateDebut) params.date_debut = dateDebut
     if (dateFin) params.date_fin = dateFin
 
@@ -77,24 +69,14 @@ export function ListeMouvements({ typeOperation, icone, titre, sousTitre, couleu
   useEffect(() => {
     charger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caisse, dateDebut, dateFin])
+  }, [dateDebut, dateFin])
 
   return (
     <Layout title={titre}>
       <PageHeader icon={icone} title={titre} subtitle={sousTitre} />
 
       <Card className="mb-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-          <Field label="Caisse">
-            <Select value={caisse} onChange={(e) => setCaisse(e.target.value)}>
-              <option value="">Toutes les caisses</option>
-              {caissesDisponibles.map((c) => (
-                <option key={c} value={c}>
-                  {LABEL_CAISSE[c]}
-                </option>
-              ))}
-            </Select>
-          </Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
           <Field label="Du">
             <TextInput type="date" value={dateDebut} onChange={(e) => setDateDebut(e.target.value)} />
           </Field>
@@ -136,7 +118,6 @@ export function ListeMouvements({ typeOperation, icone, titre, sousTitre, couleu
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
                 <th className="py-2 pr-2">Date</th>
-                <th className="py-2 pr-2">Caisse</th>
                 <th className="py-2 pr-2">Libellé</th>
                 <th className="py-2 pr-2 text-right">Montant</th>
                 <th className="py-2 pr-2">Par</th>
@@ -146,7 +127,6 @@ export function ListeMouvements({ typeOperation, icone, titre, sousTitre, couleu
               {lignes.map((m) => (
                 <tr key={m.id} className="border-b border-[#f1f5f2]">
                   <td className="py-2 pr-2 whitespace-nowrap">{formatDateHeure(m.date)}</td>
-                  <td className="py-2 pr-2 whitespace-nowrap">{LABEL_CAISSE[m.caisse] || m.caisse}</td>
                   <td className="py-2 pr-2">{m.libelle || '—'}</td>
                   <td className="py-2 pr-2 text-right font-medium whitespace-nowrap">{formatFCFA(m.montant)}</td>
                   <td className="py-2 pr-2 whitespace-nowrap">{m.valide_par || m.demande_par || '—'}</td>
@@ -154,7 +134,7 @@ export function ListeMouvements({ typeOperation, icone, titre, sousTitre, couleu
               ))}
               {lignes.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-center py-10 text-[#6b7d74]">
+                  <td colSpan={4} className="text-center py-10 text-[#6b7d74]">
                     Aucun mouvement pour cette période.
                   </td>
                 </tr>

@@ -34,9 +34,9 @@ export default function Paiements() {
   const [etablissement, setEtablissement] = useState(null)
   const [recuOuvert, setRecuOuvert] = useState(false)
   const [dernierPaiement, setDernierPaiement] = useState(null) // { montant, tranche_libelle, date_paiement, valide_par }
-  const [caissesIndisponibles, setCaissesIndisponibles] = useState([]) // ['Caisse 1', ...] si fermée/pause
+  const [caissesIndisponibles, setCaissesIndisponibles] = useState([]) // ['Caisse', ...] si fermée/pause
 
-  const LABEL_CAISSE = { principale: 'Caisse 1', secondaire: 'Caisse 2' }
+  const LABEL_CAISSE = { principale: 'Caisse' }
 
   function chargerStatutCaisses() {
     api
@@ -318,7 +318,7 @@ export default function Paiements() {
 
               {caissesIndisponibles.length > 0 && (
                 <div className="mb-3 text-sm px-3 py-2 rounded-lg bg-rose-light text-rose">
-                  {caissesIndisponibles.join(' et ')} {caissesIndisponibles.length > 1 ? 'sont fermées ou en pause' : 'est fermée ou en pause'} : ouvrez-{caissesIndisponibles.length > 1 ? 'les' : 'la'} depuis la page Caisse pour pouvoir encaisser.
+                  La caisse est fermée ou en pause : ouvrez-la depuis la page Caisse pour pouvoir encaisser.
                 </div>
               )}
 

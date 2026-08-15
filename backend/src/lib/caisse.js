@@ -1,24 +1,27 @@
 import { supabase } from '../config/supabase.js'
 
-// Deux caisses fixes dans l'app :
-// - principale : réservée au Fondateur (accès total, lui seul)
-// - secondaire : utilisée au quotidien par l'Économe et le Proviseur.
+// Une seule caisse dans l'app, gérée à trois : l'Économe, le Fondateur et le
+// Directeur des Études (Proviseur) peuvent tous consulter la caisse et y
+// enregistrer une entrée. Seul le Fondateur peut ordonner une sortie
+// (dépense/retrait) — c'est lui qui donne le "OK" pour toute sortie
+// d'argent, conformément aux recommandations reçues par l'établissement.
 //
-// NB : les valeurs 'principale'/'secondaire' (colonne type_caisse) et
-// 'Encaissement'/'Sortie' (colonne type_operation de journal_caisse) sont
-// imposées par des contraintes SQL héritées de l'ancien projet EconoSchool
-// Pro — impossible d'utiliser d'autres libellés sans modifier la contrainte
-// en base. Les réductions sont gérées à part (page Réductions, table
-// `reductions`), plus comme un mouvement de caisse.
-export const TYPES_CAISSE = ['principale', 'secondaire']
+// NB : la valeur 'principale' (colonne type_caisse) et 'Encaissement'/
+// 'Sortie' (colonne type_operation de journal_caisse) sont imposées par des
+// contraintes SQL héritées de l'ancien projet EconoSchool Pro — impossible
+// d'utiliser d'autres libellés sans modifier la contrainte en base. On garde
+// donc 'principale' comme identifiant technique unique, même si l'app
+// n'affiche plus qu'"une seule caisse" à l'écran. Les réductions sont
+// gérées à part (page Réductions, table `reductions`), plus comme un
+// mouvement de caisse.
+export const TYPES_CAISSE = ['principale']
 
 export const TYPE_ENCAISSEMENT = 'Encaissement'
 export const TYPE_SORTIE = 'Sortie'
 
-// Rôles pouvant voir/opérer chaque caisse.
+// Les trois rôles gèrent tous la caisse (consultation + entrées).
 const ACCES_CAISSE = {
-  principale: ['fondateur'],
-  secondaire: ['fondateur', 'proviseur', 'econome']
+  principale: ['fondateur', 'proviseur', 'econome']
 }
 
 export function caissesVisiblesPourRole(role) {
@@ -29,10 +32,12 @@ export function roleAAccesCaisse(role, type_caisse) {
   return (ACCES_CAISSE[type_caisse] || []).includes(role)
 }
 
-export const LABEL_CAISSE = { principale: 'Caisse 1', secondaire: 'Caisse 2' }
+export const LABEL_CAISSE = { principale: 'Caisse' }
 
 // Les sorties/retraits/dépenses sont réservés au Fondateur — l'Économe et le
-// Proviseur ne peuvent pas les exécuter.
+// Directeur des Études (Proviseur) ne peuvent pas les exécuter : ils doivent
+// avoir son OK, matérialisé ici par le fait que seul son rôle peut valider
+// l'opération.
 export function roleAAccesOperation(role, type_operation) {
   if (type_operation === TYPE_SORTIE) return role === 'fondateur'
   return true
@@ -180,47 +185,16 @@ export async function notifierRoles({ roles, etablissement, titre, message, sauf
   if (error) console.error('[notifications] erreur envoi:', error.message)
 }
 
-// Crédite automatiquement LES DEUX caisses (principale ET secondaire) lors
-// d'un paiement élève, chacune du même montant. C'est le comportement
-// attendu : Caisse 1 (réservée au Fondateur) et Caisse 2 (opérations
-// courantes) reflètent toutes les deux l'intégralité des encaissements —
-// seule la Sortie reste différenciée par rôle (cf. roleAAccesOperation).
-//
-// Les deux crédits sont indépendants : si l'un échoue, on tente quand même
-// l'autre, pour éviter qu'une des deux caisses ne prenne du retard sur
-// l'autre à cause d'une erreur isolée. Retourne { principale, secondaire },
-// chaque entrée étant soit le résultat de enregistrerMouvementCaisse, soit
-// une erreur si le crédit correspondant a échoué.
-export async function crediterCaissesParPaiement({ montant, libelle, etablissement, annee_scolaire }) {
-  const resultat = { principale: null, secondaire: null }
-
-  try {
-    resultat.principale = await enregistrerMouvementCaisse({
-      type_caisse: 'principale',
-      type_operation: TYPE_ENCAISSEMENT,
-      montant,
-      libelle,
-      etablissement,
-      annee_scolaire,
-      nom: 'Système (paiement)'
-    })
-  } catch (errPrincipale) {
-    resultat.principale = { error: errPrincipale.message }
-  }
-
-  try {
-    resultat.secondaire = await enregistrerMouvementCaisse({
-      type_caisse: 'secondaire',
-      type_operation: TYPE_ENCAISSEMENT,
-      montant,
-      libelle,
-      etablissement,
-      annee_scolaire,
-      nom: 'Système (paiement)'
-    })
-  } catch (errSecondaire) {
-    resultat.secondaire = { error: errSecondaire.message }
-  }
-
-  return resultat
+// Crédite la caisse lors d'un paiement élève. Retourne le résultat de
+// enregistrerMouvementCaisse (mouvement + caisse à jour).
+export async function crediterCaisseParPaiement({ montant, libelle, etablissement, annee_scolaire }) {
+  return enregistrerMouvementCaisse({
+    type_caisse: 'principale',
+    type_operation: TYPE_ENCAISSEMENT,
+    montant,
+    libelle,
+    etablissement,
+    annee_scolaire,
+    nom: 'Système (paiement)'
+  })
 }

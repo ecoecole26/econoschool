@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
-import { crediterCaissesParPaiement, getOrCreateCaisse, LABEL_CAISSE } from '../lib/caisse.js'
+import { crediterCaisseParPaiement, getOrCreateCaisse, LABEL_CAISSE } from '../lib/caisse.js'
 import { calculerFrais, getReductionActive } from '../lib/frais.js'
 import { envoyerSmsEtJournaliser } from '../lib/sms.js'
 
@@ -105,18 +105,13 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(404).json({ error: 'Élève introuvable' })
   }
 
-  // Un paiement crédite TOUJOURS les deux caisses : si l'une des deux est
-  // fermée ou en pause, on bloque avant même de créer le paiement, plutôt
-  // que d'enregistrer un paiement dont l'argent ne rentre nulle part.
-  const [caissePrincipale, caisseSecondaire] = await Promise.all([
-    getOrCreateCaisse('principale', req.user.etablissement),
-    getOrCreateCaisse('secondaire', req.user.etablissement)
-  ])
-  const caissesFermees = [caissePrincipale, caisseSecondaire].filter((c) => c.statut !== 'ouverte')
-  if (caissesFermees.length > 0) {
-    const noms = caissesFermees.map((c) => LABEL_CAISSE[c.type_caisse]).join(' et ')
+  // Un paiement crédite TOUJOURS la caisse : si elle est fermée ou en pause,
+  // on bloque avant même de créer le paiement, plutôt que d'enregistrer un
+  // paiement dont l'argent ne rentre nulle part.
+  const caisse = await getOrCreateCaisse('principale', req.user.etablissement)
+  if (caisse.statut !== 'ouverte') {
     return res.status(409).json({
-      error: `${noms} ${caissesFermees.length > 1 ? 'sont fermées ou en pause' : 'est fermée ou en pause'} : ouvrez-${caissesFermees.length > 1 ? 'les' : 'la'} avant d'encaisser un paiement.`
+      error: `${LABEL_CAISSE[caisse.type_caisse]} fermée ou en pause : ouvrez-la avant d'encaisser un paiement.`
     })
   }
 
@@ -140,32 +135,17 @@ router.post('/', requireAuth, async (req, res) => {
 
   // Le paiement est déjà enregistré à ce stade : un souci de crédit caisse ne
   // doit pas faire échouer la réponse (le paiement reste valide), on log juste
-  // un avertissement pour investigation. Les DEUX caisses (1 et 2) doivent
-  // recevoir le même montant.
+  // un avertissement pour investigation.
   let caisseAvertissement = null
   try {
-    const { principale, secondaire } = await crediterCaissesParPaiement({
+    await crediterCaisseParPaiement({
       montant: montantNum,
       libelle: `Paiement ${eleve.matricule} — ${tranche_libelle || 'frais'}`,
       etablissement: req.user.etablissement
     })
-
-    const echecPrincipale = !principale || principale.error
-    const echecSecondaire = !secondaire || secondaire.error
-
-    if (echecPrincipale && echecSecondaire) {
-      console.error('[paiements] erreur crédit caisses 1 et 2:', principale?.error, secondaire?.error)
-      caisseAvertissement = 'Paiement enregistré, mais le crédit des Caisses 1 et 2 a échoué.'
-    } else if (echecPrincipale) {
-      console.error('[paiements] erreur crédit caisse 1:', principale?.error)
-      caisseAvertissement = 'Paiement enregistré, mais le crédit de la Caisse 1 a échoué.'
-    } else if (echecSecondaire) {
-      console.error('[paiements] erreur crédit caisse 2:', secondaire?.error)
-      caisseAvertissement = 'Paiement enregistré, mais le crédit de la Caisse 2 a échoué.'
-    }
   } catch (errCaisse) {
-    console.error('[paiements] erreur crédit caisses:', errCaisse.message)
-    caisseAvertissement = 'Paiement enregistré, mais le crédit des caisses a échoué.'
+    console.error('[paiements] erreur crédit caisse:', errCaisse.message)
+    caisseAvertissement = 'Paiement enregistré, mais le crédit de la caisse a échoué.'
   }
 
   // Le SMS au parent est un "plus" : s'il échoue (numéro manquant, passerelle

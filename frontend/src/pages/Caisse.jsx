@@ -28,7 +28,7 @@ function formatDateHeure(valeur) {
   return `${datePart} à ${heurePart}`
 }
 
-const LABEL_CAISSE = { principale: 'Caisse 1', secondaire: 'Caisse 2' }
+const LABEL_CAISSE = { principale: 'Caisse' }
 const COULEUR_OPERATION = {
   Encaissement: 'bg-teal-light text-teal',
   Sortie: 'bg-rose-light text-rose'
@@ -106,9 +106,7 @@ export default function Caisse() {
           🗃️ Caisse
         </h2>
         <p className="text-sm text-[#6b7d74] mt-1">
-          {role === 'fondateur'
-            ? 'Caisse 1 (réservée) et Caisse 2 (opérations courantes).'
-            : 'Caisse 2 — les sorties/retraits/dépenses restent réservés au Fondateur.'}
+          Économe, Fondateur et Directeur des Études gèrent la caisse ensemble — seul le Fondateur autorise les sorties.
         </p>
       </div>
 
@@ -122,7 +120,7 @@ export default function Caisse() {
         <div className="text-sm text-[#6b7d74]">Chargement…</div>
       ) : (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:max-w-sm gap-4">
             {caisses.map((c) => (
               <CarteCaisse
                 key={c.type_caisse}
@@ -141,17 +139,15 @@ export default function Caisse() {
             </h4>
             <table className="w-full text-sm table-fixed">
               <colgroup>
-                <col className="w-[12%]" />
-                <col className="w-[14%]" />
                 <col className="w-[16%]" />
-                <col className="w-[32%]" />
-                <col className="w-[14%]" />
+                <col className="w-[18%]" />
+                <col className="w-[38%]" />
+                <col className="w-[16%]" />
                 <col className="w-[12%]" />
               </colgroup>
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
                   <th className="py-2 pr-2">Date</th>
-                  <th className="py-2 pr-2">Caisse</th>
                   <th className="py-2 pr-2">Type</th>
                   <th className="py-2 pr-2">Libellé</th>
                   <th className="py-2 pr-2 text-right">Montant</th>
@@ -162,7 +158,6 @@ export default function Caisse() {
                 {journal.map((m) => (
                   <tr key={m.id} className="border-b border-[#f1f5f2]">
                     <td className="py-2 pr-2 truncate">{formatDateHeure(m.date)}</td>
-                    <td className="py-2 pr-2 truncate">{LABEL_CAISSE[m.caisse] || m.caisse}</td>
                     <td className="py-2 pr-2">
                       <span
                         className={`text-xs font-semibold px-2 py-0.5 rounded-full ${COULEUR_OPERATION[m.type_operation] || ''}`}
@@ -177,7 +172,7 @@ export default function Caisse() {
                 ))}
                 {journal.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center py-10 text-[#6b7d74]">
+                    <td colSpan={5} className="text-center py-10 text-[#6b7d74]">
                       Aucun mouvement pour l'instant.
                     </td>
                   </tr>
@@ -275,8 +270,7 @@ function CarteCaisse({ caisse, role, onOperation, onChangerStatut, changement })
           : ''}
       </div>
 
-      {/* Pousse les deux rangées de boutons en bas de carte, alignées entre
-          Caisse 1 et Caisse 2 quelle que soit la longueur du texte au-dessus. */}
+      {/* Pousse les rangées de boutons en bas de carte. */}
       <div className="mt-auto">
         {/* Rangée 1 : état de la caisse (ouvrir / pause / fermer), 3 colonnes
             fixes pour que les boutons tombent exactement aux mêmes positions

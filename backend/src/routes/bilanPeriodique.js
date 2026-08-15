@@ -64,25 +64,11 @@ router.get('/', requireAuth, async (req, res) => {
       }
     }
 
-    // Caisse 1 (principale) reçoit une copie de chaque encaissement — c'est
-    // volontaire (contrôle anti-fraude du Fondateur), mais ça veut dire que
-    // Caisse 1 et Caisse 2 représentent souvent le MÊME argent vu sous deux
-    // angles, pas deux sommes distinctes. Additionner les deux dans un total
-    // doublerait artificiellement les montants réels. Quand la Caisse 1 est
-    // visible (rôle Fondateur), elle sert donc de référence unique pour le
-    // total — les autres rôles (Économe/Proviseur) ne voient de toute façon
-    // que la Caisse 2 seule, donc pas de changement pour eux.
-    const resume = parCaisse.principale
-      ? {
-          encaissements: parCaisse.principale.encaissements,
-          depenses: parCaisse.principale.depenses,
-          solde_actuel_total: parCaisse.principale.solde_actuel
-        }
-      : {
-          encaissements: Object.values(parCaisse).reduce((s, c) => s + c.encaissements, 0),
-          depenses: Object.values(parCaisse).reduce((s, c) => s + c.depenses, 0),
-          solde_actuel_total: Object.values(parCaisse).reduce((s, c) => s + c.solde_actuel, 0)
-        }
+    const resume = {
+      encaissements: parCaisse.principale.encaissements,
+      depenses: parCaisse.principale.depenses,
+      solde_actuel_total: parCaisse.principale.solde_actuel
+    }
     resume.net_periode = resume.encaissements - resume.depenses
 
     res.json({ debut, fin, resume, parCaisse, mouvements: mouvements || [] })
