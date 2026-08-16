@@ -29,15 +29,13 @@ const COLONNES_MODELE = [
   'Code établissement', 'Nom établissement',
   'Matricule', 'Nom', 'Prénom', 'Sexe', 'Date de naissance', 'Lieu de naissance',
   'Classe', 'Nom du parent', 'Téléphone 1', 'Téléphone 2',
-  'Moyenne_t1', 'Moyenne_t2', 'Moyenne_t3', 'moyenne_generale',
-  'decision_fin_annee', 'Qualité', 'rang_classe', 'Statut'
+  'Qualité', 'Statut'
 ]
 const EXEMPLE_MODELE = [
   '017242', 'COLLEGE EXEMPLE',
   '21421986V', 'ABDON', 'GRACE EMMANUELA SARAH', 'F', '21/06/2009', 'SAOUNDI',
   '6eme6', 'ADBON KARIM', '0759109875', '0759109875',
-  7.69, 8.15, 8.54, 8.21,
-  'Admis', 'NRedoublant', '', 'Affecte'
+  'NRedoublant', 'Affecte'
 ]
 
 // GET /api/eleves?search=...&classe=...&statut=...&page=1&pageSize=60
