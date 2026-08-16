@@ -202,7 +202,7 @@ export default function Eleves() {
           ) : eleves.length === 0 ? (
             <div className="text-center text-sm text-[#6b7d74] py-16">Aucun élève trouvé.</div>
           ) : (
-            <div className="flex flex-wrap justify-center gap-3.5">
+            <div className="flex flex-wrap justify-start gap-3.5">
               {eleves.map((el) => (
                 <div
                   key={el.id}
