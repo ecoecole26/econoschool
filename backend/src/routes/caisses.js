@@ -16,14 +16,15 @@ import {
 
 const router = Router()
 
-// GET /api/caisses -> les caisses visibles pour le rôle connecté, chacune
-// avec son journal.
+// GET /api/caisses -> les caisses visibles pour le rôle connecté DANS SON
+// ÉTABLISSEMENT, chacune avec son journal.
 router.get('/', requireAuth, async (req, res) => {
   const typesVisibles = caissesVisiblesPourRole(req.user.role)
 
   const { data: caisses, error: errCaisses } = await supabase
     .from('caisses')
     .select('*')
+    .eq('code_etablissement', req.user.code_etablissement)
     .in('type_caisse', typesVisibles)
 
   if (errCaisses) {
@@ -34,6 +35,7 @@ router.get('/', requireAuth, async (req, res) => {
   const { data: journal, error: errJournal } = await supabase
     .from('journal_caisse')
     .select('*')
+    .eq('code_etablissement', req.user.code_etablissement)
     .in('caisse', typesVisibles)
     .order('date', { ascending: false })
 
@@ -87,7 +89,7 @@ router.post('/mouvements', requireAuth, async (req, res) => {
       montant: montantNum,
       libelle,
       date,
-      etablissement: req.user.etablissement,
+      code_etablissement: req.user.code_etablissement,
       nom: req.user.nom || req.user.role
     })
 
@@ -120,7 +122,7 @@ router.post('/:type_caisse/statut', requireAuth, async (req, res) => {
     const caisse = await changerStatutCaisse({
       type_caisse,
       statut,
-      etablissement: req.user.etablissement,
+      code_etablissement: req.user.code_etablissement,
       nom
     })
 
@@ -134,7 +136,7 @@ router.post('/:type_caisse/statut', requireAuth, async (req, res) => {
       })
       await notifierRoles({
         roles: ['proviseur', 'fondateur'],
-        etablissement: req.user.etablissement,
+        code_etablissement: req.user.code_etablissement,
         sauf_role: req.user.role,
         titre: `${LABEL_CAISSE[type_caisse]} ouverte`,
         message: `${nom} a ouvert la ${LABEL_CAISSE[type_caisse]} le ${dateAffichee} à ${heureAffichee}.`

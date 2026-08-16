@@ -4,15 +4,15 @@ import { requireAuth } from '../middleware/requireAuth.js'
 
 const router = Router()
 
-// Un seul établissement par déploiement pour l'instant (comme l'ancien projet) :
-// on prend la première ligne de la table. À faire évoluer si un jour un même
-// déploiement doit servir plusieurs établissements.
+// Un établissement par utilisateur connecté : on prend la ligne dont
+// code_etablissement correspond au code dans le token (posé à la
+// connexion). Chaque établissement a désormais sa propre ligne.
 
 router.get('/', requireAuth, async (req, res) => {
   const { data, error } = await supabase
     .from('etablissements')
     .select('*')
-    .limit(1)
+    .eq('code_etablissement', req.user.code_etablissement)
     .maybeSingle()
 
   if (error) {
@@ -30,12 +30,27 @@ router.put('/', requireAuth, async (req, res) => {
 
   const payload = req.body || {}
   delete payload.id
+  // Le code établissement ne peut jamais être changé depuis cette route :
+  // le changer détacherait toutes les données déjà rattachées à ce code
+  // (élèves, tarifs, paiements...). Il reste toujours celui du compte connecté.
+  delete payload.code_etablissement
 
-  const { data: existing } = await supabase.from('etablissements').select('id').limit(1).maybeSingle()
+  const { data: existing } = await supabase
+    .from('etablissements')
+    .select('id')
+    .eq('code_etablissement', req.user.code_etablissement)
+    .maybeSingle()
 
-  const { data, error } = existing
-    ? await supabase.from('etablissements').update(payload).eq('id', existing.id).select().single()
-    : await supabase.from('etablissements').insert(payload).select().single()
+  if (!existing) {
+    return res.status(404).json({ error: 'Établissement introuvable pour ce compte' })
+  }
+
+  const { data, error } = await supabase
+    .from('etablissements')
+    .update(payload)
+    .eq('id', existing.id)
+    .select()
+    .single()
 
   if (error) {
     console.error('[etablissement] erreur sauvegarde:', error.message)

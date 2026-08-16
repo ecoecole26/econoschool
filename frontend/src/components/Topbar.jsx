@@ -4,10 +4,13 @@ import NotificationBell from './NotificationBell.jsx'
 export default function Topbar({ title, onToggleSidebar }) {
   const navigate = useNavigate()
   const role = localStorage.getItem('econoschool_role')
+  const nomEtablissement = localStorage.getItem('econoschool_nom_etablissement')
 
   function logout() {
     localStorage.removeItem('econoschool_token')
     localStorage.removeItem('econoschool_role')
+    localStorage.removeItem('econoschool_code_etablissement')
+    localStorage.removeItem('econoschool_nom_etablissement')
     navigate('/')
   }
 
@@ -29,7 +32,7 @@ export default function Topbar({ title, onToggleSidebar }) {
         <NotificationBell />
         <div className="text-right leading-tight hidden sm:block">
           <div className="text-sm font-semibold text-vert-fonce capitalize">{role || '—'}</div>
-          <div className="text-xs text-[#6b7d74]">Espace EconoSchool</div>
+          <div className="text-xs text-[#6b7d74] truncate max-w-[160px]">{nomEtablissement || 'Espace EconoSchool'}</div>
         </div>
         <button
           onClick={logout}

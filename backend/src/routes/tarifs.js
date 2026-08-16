@@ -4,11 +4,12 @@ import { requireAuth } from '../middleware/requireAuth.js'
 
 const router = Router()
 
-// GET /api/tarifs -> tous les niveaux, triés
+// GET /api/tarifs -> tous les niveaux de MON établissement, triés
 router.get('/', requireAuth, async (req, res) => {
   const { data, error } = await supabase
     .from('tarifs')
     .select('*')
+    .eq('code_etablissement', req.user.code_etablissement)
     .not('niveau', 'is', null)
     .order('ordre', { ascending: true })
 
@@ -47,6 +48,7 @@ router.put('/', requireAuth, async (req, res) => {
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
+      .eq('code_etablissement', req.user.code_etablissement)
       .select()
       .single()
 

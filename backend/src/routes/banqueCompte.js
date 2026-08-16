@@ -4,12 +4,13 @@ import { requireAuth } from '../middleware/requireAuth.js'
 
 const router = Router()
 
-// GET /api/banque-compte -> le compte (ou null si pas encore configuré) + le journal
+// GET /api/banque-compte -> le compte de MON établissement (ou null si pas
+// encore configuré) + le journal
 router.get('/', requireAuth, async (req, res) => {
   const { data: compte, error: err1 } = await supabase
     .from('banque')
     .select('*')
-    .limit(1)
+    .eq('code_etablissement', req.user.code_etablissement)
     .maybeSingle()
 
   if (err1) {
@@ -42,7 +43,11 @@ router.put('/', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'Seul le Fondateur peut configurer le compte' })
   }
 
-  const { data: existing } = await supabase.from('banque').select('id').limit(1).maybeSingle()
+  const { data: existing } = await supabase
+    .from('banque')
+    .select('id')
+    .eq('code_etablissement', req.user.code_etablissement)
+    .maybeSingle()
   if (existing) {
     return res.status(400).json({ error: 'Le compte est déjà configuré' })
   }
@@ -51,7 +56,11 @@ router.put('/', requireAuth, async (req, res) => {
 
   const { data, error } = await supabase
     .from('banque')
-    .insert({ solde_initial: soldeInitial, solde_actuel: soldeInitial })
+    .insert({
+      solde_initial: soldeInitial,
+      solde_actuel: soldeInitial,
+      code_etablissement: req.user.code_etablissement
+    })
     .select()
     .single()
 
@@ -78,7 +87,7 @@ router.post('/mouvements', requireAuth, async (req, res) => {
   const { data: compte, error: errCompte } = await supabase
     .from('banque')
     .select('*')
-    .limit(1)
+    .eq('code_etablissement', req.user.code_etablissement)
     .maybeSingle()
 
   if (errCompte || !compte) {

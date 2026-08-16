@@ -5,17 +5,38 @@ import { api } from '../lib/api.js'
 export default function Login() {
   const navigate = useNavigate()
   const [role, setRole] = useState('fondateur')
+  const [codeEtablissement, setCodeEtablissement] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [needsBootstrap, setNeedsBootstrap] = useState(false)
+  const [statutEtablissement, setStatutEtablissement] = useState(null) // null | { needsBootstrap, etablissementExiste, nom_etablissement }
 
+  // Dès que le code établissement tapé fait au moins 3 caractères, on
+  // vérifie (avec un petit délai pour ne pas spammer à chaque frappe) si cet
+  // établissement précis a déjà un compte Fondateur configuré. Ça permet
+  // d'afficher "Aucun compte configuré pour ce code" avec le lien vers la
+  // création, sans jamais mélanger les établissements entre eux.
   useEffect(() => {
-    api.getBootstrapStatus().then(({ needsBootstrap }) => setNeedsBootstrap(needsBootstrap)).catch(() => {})
-  }, [])
+    const code = codeEtablissement.trim()
+    if (code.length < 3) {
+      setStatutEtablissement(null)
+      return
+    }
+    const minuteur = setTimeout(() => {
+      api
+        .getBootstrapStatus(code)
+        .then((statut) => setStatutEtablissement(statut))
+        .catch(() => setStatutEtablissement(null))
+    }, 500)
+    return () => clearTimeout(minuteur)
+  }, [codeEtablissement])
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (!codeEtablissement.trim()) {
+      setError('Entrez le code établissement')
+      return
+    }
     if (!password) {
       setError('Entrez le mot de passe')
       return
@@ -23,12 +44,18 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      const { token } = await api.login(role, password)
+      const { token, code_etablissement, nom_etablissement } = await api.login(
+        role,
+        password,
+        codeEtablissement.trim()
+      )
       localStorage.setItem('econoschool_token', token)
       localStorage.setItem('econoschool_role', role)
+      localStorage.setItem('econoschool_code_etablissement', code_etablissement || '')
+      localStorage.setItem('econoschool_nom_etablissement', nom_etablissement || '')
       navigate('/tableau-de-bord')
     } catch (err) {
-      setError(err.message || 'Mot de passe incorrect')
+      setError(err.message || 'Connexion impossible')
     } finally {
       setLoading(false)
     }
@@ -59,47 +86,65 @@ export default function Login() {
         {/* Panneau droit - formulaire */}
         <div className="md:w-1/2 px-10 py-14 md:px-[80px] flex flex-col justify-center">
           <h3 className="text-[44px] font-display font-bold text-vert-fonce mb-3">Connexion</h3>
-          <p className="text-lg text-[#6b7d74] mb-10 leading-relaxed">
-            Entrez vos identifiants pour accéder à votre espace.
+          <p className="text-lg text-[#6b7d74] mb-8 leading-relaxed">
+            Entrez le code de votre établissement, choisissez votre rôle, puis votre mot de passe.
           </p>
 
-          <div className="flex gap-3 bg-[#f3f6f4] border border-[#e3ebe6] rounded-2xl p-2 mb-9">
-            <button
-              type="button"
-              onClick={() => setRole('fondateur')}
-              className={`flex-1 text-center py-3 px-2 rounded-xl text-base font-semibold transition ${
-                role === 'fondateur'
-                  ? 'bg-white text-[#8a5b00] shadow-sm'
-                  : 'text-[#7a4a34]'
-              }`}
-            >
-              👑 Fondateur
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole('proviseur')}
-              className={`flex-1 text-center py-3 px-2 rounded-xl text-base font-semibold transition ${
-                role === 'proviseur'
-                  ? 'bg-white text-[#8a5b00] shadow-sm'
-                  : 'text-[#7a4a34]'
-              }`}
-            >
-              🎓 Proviseur
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole('econome')}
-              className={`flex-1 text-center py-3 px-2 rounded-xl text-base font-semibold transition ${
-                role === 'econome'
-                  ? 'bg-white text-[#8a5b00] shadow-sm'
-                  : 'text-[#7a4a34]'
-              }`}
-            >
-              💼 Économe
-            </button>
-          </div>
-
           <form onSubmit={handleSubmit}>
+            <div className="mb-6">
+              <label className="block text-center text-lg font-bold text-vert-fonce mb-3">
+                Code établissement
+              </label>
+              <input
+                type="text"
+                value={codeEtablissement}
+                onChange={(e) => setCodeEtablissement(e.target.value)}
+                placeholder="ex : 017242"
+                className="w-full px-5 py-5 border-2 border-[#e3ebe6] rounded-2xl text-lg bg-[#fbfdfc] focus:outline-none focus:border-vert-clair text-center tracking-wide"
+              />
+              {statutEtablissement?.etablissementExiste && (
+                <p className="text-center text-sm text-teal font-semibold mt-2">
+                  {statutEtablissement.nom_etablissement}
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-3 bg-[#f3f6f4] border border-[#e3ebe6] rounded-2xl p-2 mb-6">
+              <button
+                type="button"
+                onClick={() => setRole('fondateur')}
+                className={`flex-1 text-center py-3 px-2 rounded-xl text-base font-semibold transition ${
+                  role === 'fondateur'
+                    ? 'bg-white text-[#8a5b00] shadow-sm'
+                    : 'text-[#7a4a34]'
+                }`}
+              >
+                👑 Fondateur
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole('proviseur')}
+                className={`flex-1 text-center py-3 px-2 rounded-xl text-base font-semibold transition ${
+                  role === 'proviseur'
+                    ? 'bg-white text-[#8a5b00] shadow-sm'
+                    : 'text-[#7a4a34]'
+                }`}
+              >
+                🎓 Proviseur
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole('econome')}
+                className={`flex-1 text-center py-3 px-2 rounded-xl text-base font-semibold transition ${
+                  role === 'econome'
+                    ? 'bg-white text-[#8a5b00] shadow-sm'
+                    : 'text-[#7a4a34]'
+                }`}
+              >
+                💼 Économe
+              </button>
+            </div>
+
             <div className="mb-6">
               <label className="block text-center text-lg font-bold text-vert-fonce mb-3">
                 Mot de passe
@@ -128,10 +173,15 @@ export default function Login() {
             </button>
           </form>
 
-          {needsBootstrap && (
+          {statutEtablissement?.needsBootstrap && (
             <p className="text-center text-base text-[#6b7d74] mt-7">
-              Aucun compte configuré —{' '}
-              <Link to="/creation-compte" className="text-teal font-semibold">
+              {statutEtablissement.etablissementExiste
+                ? 'Aucun compte Fondateur configuré pour cet établissement —'
+                : "Cet établissement n'existe pas encore ici —"}{' '}
+              <Link
+                to={`/creation-compte?code=${encodeURIComponent(codeEtablissement.trim())}`}
+                className="text-teal font-semibold"
+              >
                 créer le premier compte Fondateur
               </Link>
             </p>

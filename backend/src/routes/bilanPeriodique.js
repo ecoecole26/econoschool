@@ -7,9 +7,9 @@ import { fetchTout } from '../lib/supabasePagination.js'
 const router = Router()
 
 // GET /api/bilan-periodique?debut=YYYY-MM-DD&fin=YYYY-MM-DD
-// Résumé financier sur une période choisie : encaissements, dépenses (sorties)
-// et solde actuel des caisses visibles pour le rôle connecté, avec le détail
-// caisse par caisse.
+// Résumé financier sur une période choisie, POUR MON ÉTABLISSEMENT :
+// encaissements, dépenses (sorties) et solde actuel des caisses visibles
+// pour le rôle connecté, avec le détail caisse par caisse.
 router.get('/', requireAuth, async (req, res) => {
   const { debut, fin } = req.query
   if (!debut || !fin) {
@@ -30,11 +30,16 @@ router.get('/', requireAuth, async (req, res) => {
 
   try {
     const [{ data: caisses, error: errCaisses }, mouvements] = await Promise.all([
-      supabase.from('caisses').select('*').in('type_caisse', typesVisibles),
+      supabase
+        .from('caisses')
+        .select('*')
+        .eq('code_etablissement', req.user.code_etablissement)
+        .in('type_caisse', typesVisibles),
       fetchTout((from, to) =>
         supabase
           .from('journal_caisse')
           .select('*')
+          .eq('code_etablissement', req.user.code_etablissement)
           .in('caisse', typesVisibles)
           .eq('statut', 'validee')
           .gte('date', debut)

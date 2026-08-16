@@ -4,11 +4,13 @@ import { requireAuth } from '../middleware/requireAuth.js'
 
 const router = Router()
 
-// GET /api/types-frais -> les catégories avec leurs tranches imbriquées
+// GET /api/types-frais -> les catégories de MON établissement, avec leurs
+// tranches imbriquées.
 router.get('/', requireAuth, async (req, res) => {
   const { data: types, error: err1 } = await supabase
     .from('types_frais')
     .select('*')
+    .eq('code_etablissement', req.user.code_etablissement)
     .order('ordre', { ascending: true })
 
   if (err1) {
@@ -16,10 +18,10 @@ router.get('/', requireAuth, async (req, res) => {
     return res.status(500).json({ error: 'Erreur lors de la lecture des types de frais' })
   }
 
-  const { data: tranches, error: err2 } = await supabase
-    .from('tranches_frais')
-    .select('*')
-    .order('ordre', { ascending: true })
+  const idsTypes = (types || []).map((t) => t.id)
+  const { data: tranches, error: err2 } = idsTypes.length
+    ? await supabase.from('tranches_frais').select('*').in('type_frais_id', idsTypes).order('ordre', { ascending: true })
+    : { data: [], error: null }
 
   if (err2) {
     console.error('[types-frais] erreur lecture tranches:', err2.message)
@@ -46,6 +48,7 @@ router.post('/:typeId/tranches', requireAuth, async (req, res) => {
     .from('types_frais')
     .select('echeances_max')
     .eq('id', typeId)
+    .eq('code_etablissement', req.user.code_etablissement)
     .maybeSingle()
 
   if (!type) return res.status(404).json({ error: 'Type de frais introuvable' })
@@ -84,6 +87,18 @@ router.delete('/tranches/:id', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'Seul le Fondateur peut modifier les types de frais' })
   }
 
+  // Vérifie que la tranche appartient bien à un type de frais de mon
+  // établissement avant de la supprimer (défense en profondeur : l'id est
+  // un UUID difficile à deviner, mais on ne prend pas de risque).
+  const { data: tranche } = await supabase
+    .from('tranches_frais')
+    .select('id, type_frais_id, types_frais!inner(code_etablissement)')
+    .eq('id', req.params.id)
+    .eq('types_frais.code_etablissement', req.user.code_etablissement)
+    .maybeSingle()
+
+  if (!tranche) return res.status(404).json({ error: 'Tranche introuvable' })
+
   const { error } = await supabase.from('tranches_frais').delete().eq('id', req.params.id)
 
   if (error) {
@@ -106,8 +121,21 @@ router.put('/tranches', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Liste de tranches invalide' })
   }
 
+  // Restreint la sauvegarde aux tranches qui appartiennent bien à mon
+  // établissement (défense en profondeur).
+  const { data: mesTypes } = await supabase
+    .from('types_frais')
+    .select('id')
+    .eq('code_etablissement', req.user.code_etablissement)
+  const mesTypesIds = new Set((mesTypes || []).map((t) => t.id))
+
+  const { data: mesTranches } = mesTypesIds.size
+    ? await supabase.from('tranches_frais').select('id, type_frais_id').in('type_frais_id', [...mesTypesIds])
+    : { data: [] }
+  const mesTranchesIds = new Set((mesTranches || []).map((t) => t.id))
+
   for (const t of tranches) {
-    if (!t.id) continue
+    if (!t.id || !mesTranchesIds.has(t.id)) continue
     const { error } = await supabase
       .from('tranches_frais')
       .update({ label: t.label, date_echeance: t.date_echeance || null })

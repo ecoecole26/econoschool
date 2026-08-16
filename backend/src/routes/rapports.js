@@ -16,17 +16,18 @@ function feuilleAvecLargeurs(aoa, largeurs) {
 }
 
 // GET /api/rapports/export
-// Génère le classeur Excel du rapport général (page Rapports) : une feuille
-// par section (Effectifs, Finances, Caisses, Répartition par niveau), avec
-// les mêmes chiffres que ceux affichés à l'écran.
+// Génère le classeur Excel du rapport général (page Rapports) POUR MON
+// ÉTABLISSEMENT : une feuille par section (Effectifs, Finances, Caisses,
+// Répartition par niveau), avec les mêmes chiffres que ceux affichés à l'écran.
 router.get('/export', requireAuth, async (req, res) => {
   try {
-    const { lignes, resume } = await calculerBilanEleves({})
+    const { lignes, resume } = await calculerBilanEleves({ code_etablissement: req.user.code_etablissement })
 
     const typesVisibles = caissesVisiblesPourRole(req.user.role)
     const { data: caissesData, error: errCaisses } = await supabase
       .from('caisses')
       .select('*')
+      .eq('code_etablissement', req.user.code_etablissement)
       .in('type_caisse', typesVisibles)
     if (errCaisses) throw errCaisses
     const caisses = TYPES_CAISSE.filter((t) => typesVisibles.includes(t)).map(

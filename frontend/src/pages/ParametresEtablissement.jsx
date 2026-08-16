@@ -84,7 +84,10 @@ export default function ParametresEtablissement() {
               <TextInput value={form.nom} onChange={set('nom')} placeholder="Collège Moderne Bouaké Dar Es Salam" />
             </Field>
             <Field label="Code établissement (DRENAET)">
-              <TextInput value={form.code_etablissement} onChange={set('code_etablissement')} placeholder="017242" />
+              <TextInput value={form.code_etablissement} disabled placeholder="017242" />
+              <p className="text-xs text-[#9aa8a1] mt-1">
+                Non modifiable ici : c'est ce code qui isole tes données de celles des autres établissements.
+              </p>
             </Field>
 
             <Field label="Type">

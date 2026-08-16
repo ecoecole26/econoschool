@@ -154,17 +154,21 @@ export default function ImportEleves() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <Card title="Format attendu du fichier Excel" icon="📄">
           <p className="text-sm text-[#3d4f45] mb-3">
-            Envoyez votre fichier Excel du ministère <b>tel quel, sans aucune modification</b>.
+            Envoyez votre fichier Excel du ministère <b>tel quel, sans aucune modification</b>, ou le
+            modèle ci-dessous. Chaque établissement ayant sa propre liste d'élèves, le fichier doit
+            indiquer le <b>code et le nom de ton établissement</b> — télécharge le modèle pour les
+            avoir déjà pré-remplis.
           </p>
           <div className="bg-[#f6f8f7] border border-[#e3ebe6] rounded-lg p-3 text-xs font-mono overflow-x-auto mb-4">
-            Matricule | Nom | Prénom | Classe | Qualité | Statut | ...
+            Code établissement | Nom établissement | Matricule | Nom | Prénom | Classe | Qualité | Statut | ...
           </div>
           <ul className="text-sm text-[#6b7d74] list-disc pl-5 space-y-1.5">
+            <li>Colonnes <b>Code établissement</b> / <b>CodeEts</b> (fichier ministériel) : garde-fou anti-erreur — un fichier venant clairement d'une autre école est refusé en bloc, une ligne isolée mal renseignée est simplement ignorée</li>
             <li>Colonne <b>Statut</b> : "Affecte" / "NAffecte" (reconnu automatiquement)</li>
             <li>Colonne <b>Qualité</b> : "Redoublant" / "NRedoublant" (reconnu automatiquement)</li>
             <li>Le <b>niveau</b> (6eme, 5eme…) est déduit automatiquement de la classe</li>
             <li>Toutes les autres colonnes du fichier (moyennes, téléphones, etc.) sont ignorées sans problème</li>
-            <li>Un élève déjà existant (même matricule) est mis à jour, sinon il est créé</li>
+            <li>Un élève déjà existant (même matricule, même établissement) est mis à jour, sinon il est créé</li>
           </ul>
 
           <button

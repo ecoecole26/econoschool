@@ -7,8 +7,8 @@ const router = Router()
 
 // GET /api/mouvements?type_operation=Encaissement|Sortie&caisse=&date_debut=&date_fin=
 // Sert les pages "Entrées" (Encaissement) et "Dépenses" (Sortie) : liste des
-// mouvements du journal_caisse filtrés par type, avec le total sur la
-// période/le filtre demandé.
+// mouvements du journal_caisse DE MON ÉTABLISSEMENT, filtrés par type, avec
+// le total sur la période/le filtre demandé.
 router.get('/', requireAuth, async (req, res) => {
   const { type_operation, date_debut = '', date_fin = '' } = req.query || {}
 
@@ -21,6 +21,7 @@ router.get('/', requireAuth, async (req, res) => {
   let q = supabase
     .from('journal_caisse')
     .select('*')
+    .eq('code_etablissement', req.user.code_etablissement)
     .eq('type_operation', type_operation)
     .in('caisse', typesVisibles)
     .order('date', { ascending: false })

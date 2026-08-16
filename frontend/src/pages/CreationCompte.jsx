@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import { Card, Field, TextInput } from '../components/ui.jsx'
@@ -9,8 +9,19 @@ const EMPTY_COMPTE = { nom_complet: '', login: '', mot_de_passe: '' }
 const ROLES = ['fondateur', 'proviseur', 'econome']
 
 export default function CreationCompte() {
+  const [searchParams] = useSearchParams()
   const isLoggedIn = !!localStorage.getItem('econoschool_token')
+  const monCodeEtablissement = localStorage.getItem('econoschool_code_etablissement') || ''
+
+  // Établissement ciblé par cette page : celui du compte déjà connecté s'il
+  // y en a un, sinon celui passé dans l'URL (venant du lien "créer le
+  // premier compte Fondateur" sur l'écran de connexion).
+  const [codeEtablissement, setCodeEtablissement] = useState(
+    monCodeEtablissement || searchParams.get('code') || ''
+  )
+  const [nomEtablissement, setNomEtablissement] = useState('')
   const [needsBootstrap, setNeedsBootstrap] = useState(false)
+  const [etablissementExiste, setEtablissementExiste] = useState(true)
   const [comptes, setComptes] = useState({
     fondateur: EMPTY_COMPTE,
     proviseur: EMPTY_COMPTE,
@@ -21,10 +32,17 @@ export default function CreationCompte() {
   const [message, setMessage] = useState({ fondateur: '', proviseur: '', econome: '' })
 
   useEffect(() => {
+    const code = codeEtablissement.trim()
+    if (!code) {
+      setLoading(false)
+      return
+    }
     api
-      .getBootstrapStatus()
-      .then(({ needsBootstrap }) => {
+      .getBootstrapStatus(code)
+      .then(({ needsBootstrap, etablissementExiste, nom_etablissement }) => {
         setNeedsBootstrap(needsBootstrap)
+        setEtablissementExiste(etablissementExiste)
+        if (nom_etablissement) setNomEtablissement(nom_etablissement)
         if (!needsBootstrap && isLoggedIn) {
           return api.getComptes().then(({ comptes: c }) => {
             setComptes({
@@ -50,7 +68,9 @@ export default function CreationCompte() {
     setMessage((m) => ({ ...m, [role]: '' }))
     try {
       const { mot_de_passe, ...rest } = comptes[role]
-      const payload = mot_de_passe ? { ...rest, mot_de_passe } : rest
+      const payload = mot_de_passe
+        ? { ...rest, mot_de_passe, code_etablissement: codeEtablissement.trim(), nom_etablissement: nomEtablissement.trim() }
+        : { ...rest, code_etablissement: codeEtablissement.trim(), nom_etablissement: nomEtablissement.trim() }
       const { compte } = await api.saveCompte(role, payload)
       setComptes((c) => ({ ...c, [role]: { ...compte, mot_de_passe: '' } }))
       setMessage((m) => ({ ...m, [role]: 'Enregistré ✅' }))
@@ -62,16 +82,16 @@ export default function CreationCompte() {
     }
   }
 
-  // Cas 1 : personne n'est connecté ET il existe déjà un compte Fondateur
-  // → il faut se connecter pour gérer les comptes.
-  if (!loading && !needsBootstrap && !isLoggedIn) {
+  // Cas 0 : aucun code établissement connu (ni connecté, ni passé dans l'URL)
+  // → on ne peut rien faire sans savoir pour quel établissement.
+  if (!loading && !codeEtablissement.trim() && !isLoggedIn) {
     return (
       <div className="min-h-screen flex items-center justify-center px-6">
         <div className="bg-white rounded-2xl border border-[#e3ebe6] p-8 max-w-sm text-center">
-          <div className="text-3xl mb-3">🔒</div>
-          <h2 className="font-display font-bold text-vert-fonce mb-2">Connexion requise</h2>
+          <div className="text-3xl mb-3">🏫</div>
+          <h2 className="font-display font-bold text-vert-fonce mb-2">Code établissement requis</h2>
           <p className="text-sm text-[#6b7d74] mb-5">
-            Un compte Fondateur existe déjà. Connecte-toi avec ce compte pour gérer les comptes.
+            Retourne à l'écran de connexion, entre le code de ton établissement, puis reviens ici.
           </p>
           <Link
             to="/"
@@ -84,8 +104,32 @@ export default function CreationCompte() {
     )
   }
 
-  // Cas 2 : premier lancement, aucun Fondateur — écran de création minimal, sans sidebar
-  // (on ne peut pas encore afficher le shell complet puisqu'il n'y a personne de connecté).
+  // Cas 1 : personne n'est connecté ET il existe déjà un compte Fondateur
+  // pour cet établissement → il faut se connecter pour gérer les comptes.
+  if (!loading && !needsBootstrap && !isLoggedIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6">
+        <div className="bg-white rounded-2xl border border-[#e3ebe6] p-8 max-w-sm text-center">
+          <div className="text-3xl mb-3">🔒</div>
+          <h2 className="font-display font-bold text-vert-fonce mb-2">Connexion requise</h2>
+          <p className="text-sm text-[#6b7d74] mb-5">
+            Un compte Fondateur existe déjà pour {nomEtablissement || 'cet établissement'}. Connecte-toi avec ce compte pour gérer les comptes.
+          </p>
+          <Link
+            to="/"
+            className="inline-block px-5 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold"
+          >
+            Aller à la connexion
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  // Cas 2 : premier lancement pour CET établissement — aucun Fondateur —
+  // écran de création minimal, sans sidebar (on ne peut pas encore afficher
+  // le shell complet puisqu'il n'y a personne de connecté). Le code
+  // établissement n'est modifiable que tant qu'il n'existe pas encore.
   if (!loading && needsBootstrap) {
     return (
       <div className="min-h-screen flex items-center justify-center px-6 bg-bg">
@@ -94,9 +138,31 @@ export default function CreationCompte() {
             <img src="/logo-icon.png" alt="EconoSchool" className="w-16 h-16 rounded-full bg-white p-2 mx-auto mb-3 shadow" />
             <h1 className="font-display font-bold text-xl text-vert-fonce">Bienvenue sur EconoSchool</h1>
             <p className="text-sm text-[#6b7d74] mt-1">
-              Aucun compte Fondateur n'existe encore — créons-le maintenant.
+              {etablissementExiste
+                ? "Cet établissement n'a pas encore de compte Fondateur — créons-le maintenant."
+                : "Nouvel établissement — créons son compte Fondateur maintenant."}
             </p>
           </div>
+
+          <Card title="Établissement" icon="🏫">
+            <Field label="Code établissement" required>
+              <TextInput
+                value={codeEtablissement}
+                onChange={(e) => setCodeEtablissement(e.target.value)}
+                placeholder="ex : 017242"
+                disabled={etablissementExiste}
+              />
+            </Field>
+            <Field label="Nom de l'établissement" required>
+              <TextInput
+                value={nomEtablissement}
+                onChange={(e) => setNomEtablissement(e.target.value)}
+                placeholder="ex : Collège Moderne de..."
+                disabled={etablissementExiste}
+              />
+            </Field>
+          </Card>
+
           <CompteCard
             role="fondateur"
             icon="👑"
@@ -112,7 +178,8 @@ export default function CreationCompte() {
     )
   }
 
-  // Cas 3 : connecté en tant que Fondateur → gestion normale des 2 comptes
+  // Cas 3 : connecté en tant que Fondateur → gestion normale des 3 comptes
+  // de MON établissement (code_etablissement vient du token, pas modifiable ici).
   return (
     <Layout title="Création de compte">
       <PageHeader

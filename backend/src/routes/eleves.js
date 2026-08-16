@@ -20,14 +20,20 @@ const uploadZip = multer({
 
 const PHOTOS_BUCKET = 'photos-eleves'
 
-// Colonnes attendues dans le fichier Excel du ministère (ordre du modèle téléchargeable).
+// Colonnes attendues dans le fichier Excel à importer. "Code établissement"
+// et "Nom établissement" sont désormais en tête : c'est le garde-fou qui
+// empêche d'importer par erreur le fichier d'un AUTRE établissement dans le
+// tien (voir logique de validation dans POST /import). Le reste reprend
+// l'ordre du modèle ministériel téléchargeable.
 const COLONNES_MODELE = [
+  'Code établissement', 'Nom établissement',
   'Matricule', 'Nom', 'Prénom', 'Sexe', 'Date de naissance', 'Lieu de naissance',
   'Classe', 'Nom du parent', 'Téléphone 1', 'Téléphone 2',
   'Moyenne_t1', 'Moyenne_t2', 'Moyenne_t3', 'moyenne_generale',
   'decision_fin_annee', 'Qualité', 'rang_classe', 'Statut'
 ]
 const EXEMPLE_MODELE = [
+  '017242', 'COLLEGE EXEMPLE',
   '21421986V', 'ABDON', 'GRACE EMMANUELA SARAH', 'F', '21/06/2009', 'SAOUNDI',
   '6eme6', 'ADBON KARIM', '0759109875', '0759109875',
   7.69, 8.15, 8.54, 8.21,
@@ -43,6 +49,7 @@ router.get('/', requireAuth, async (req, res) => {
   const to = from + pageSize - 1
 
   function appliquerFiltres(q) {
+    q = q.eq('code_etablissement', req.user.code_etablissement)
     if (search) q = q.or(`nom.ilike.%${search}%,matricule.ilike.%${search}%`)
     if (classe) q = q.ilike('classe', `%${classe}%`)
     if (statut) q = q.eq('statut', statut)
@@ -81,8 +88,8 @@ router.get('/', requireAuth, async (req, res) => {
 })
 
 // Calcule le bilan (total dû/payé/reste + statut) pour chaque élève
-// correspondant aux filtres donnés. Partagé par GET /bilan (JSON, pour la
-// page Retards) et GET /bilan/export (fichier Excel).
+// correspondant aux filtres donnés, POUR L'ÉTABLISSEMENT DONNÉ. Partagé par
+// GET /bilan (JSON, pour la page Retards) et GET /bilan/export (fichier Excel).
 // Renvoie la date butoir applicable à un niveau donné : celle spécifique au
 // niveau si elle existe, sinon la date globale, sinon null (pas de notion de
 // date — on retombe alors sur l'ancien comportement "non soldé = en retard").
@@ -90,9 +97,19 @@ function dateButoirPourNiveau(niveau, { global, parNiveau }) {
   return (niveau && parNiveau[niveau]) || global || null
 }
 
-export async function calculerBilanEleves({ search = '', classe = '', niveau = '', statutPaiementFiltre = '' }) {
+export async function calculerBilanEleves({
+  code_etablissement,
+  search = '',
+  classe = '',
+  niveau = '',
+  statutPaiementFiltre = ''
+}) {
   const eleves = await fetchTout((from, to) => {
-    let q = supabase.from('eleves').select('*').order('nom', { ascending: true })
+    let q = supabase
+      .from('eleves')
+      .select('*')
+      .eq('code_etablissement', code_etablissement)
+      .order('nom', { ascending: true })
     if (search) q = q.or(`nom.ilike.%${search}%,matricule.ilike.%${search}%`)
     if (classe) q = q.ilike('classe', `%${classe}%`)
     if (niveau) q = q.eq('niveau', niveau)
@@ -100,12 +117,31 @@ export async function calculerBilanEleves({ search = '', classe = '', niveau = '
   })
 
   const [tarifs, reductions, paiements, datesButoirBrutes] = await Promise.all([
-    fetchTout((from, to) => supabase.from('tarifs').select('*').range(from, to)),
     fetchTout((from, to) =>
-      supabase.from('reductions').select('eleve_id, pourcentage').eq('statut', 'active').range(from, to)
+      supabase.from('tarifs').select('*').eq('code_etablissement', code_etablissement).range(from, to)
     ),
-    fetchTout((from, to) => supabase.from('paiements').select('eleve_id, montant').range(from, to)),
-    fetchTout((from, to) => supabase.from('dates_butoir').select('niveau, date_butoir').range(from, to))
+    fetchTout((from, to) =>
+      supabase
+        .from('reductions')
+        .select('eleve_id, pourcentage')
+        .eq('code_etablissement', code_etablissement)
+        .eq('statut', 'active')
+        .range(from, to)
+    ),
+    fetchTout((from, to) =>
+      supabase
+        .from('paiements')
+        .select('eleve_id, montant')
+        .eq('code_etablissement', code_etablissement)
+        .range(from, to)
+    ),
+    fetchTout((from, to) =>
+      supabase
+        .from('dates_butoir')
+        .select('niveau, date_butoir')
+        .eq('code_etablissement', code_etablissement)
+        .range(from, to)
+    )
   ])
 
   const tarifParNiveau = new Map((tarifs || []).map((t) => [t.niveau, t]))
@@ -191,7 +227,13 @@ router.get('/bilan', requireAuth, async (req, res) => {
   } = req.query
 
   try {
-    const { lignes, resume } = await calculerBilanEleves({ search, classe, niveau, statutPaiementFiltre })
+    const { lignes, resume } = await calculerBilanEleves({
+      code_etablissement: req.user.code_etablissement,
+      search,
+      classe,
+      niveau,
+      statutPaiementFiltre
+    })
     res.json({ lignes, resume })
   } catch (err) {
     console.error('[eleves] erreur bilan:', err.message)
@@ -213,7 +255,13 @@ router.get('/bilan/export', requireAuth, async (req, res) => {
 
   let lignes
   try {
-    ;({ lignes } = await calculerBilanEleves({ search, classe, niveau, statutPaiementFiltre }))
+    ;({ lignes } = await calculerBilanEleves({
+      code_etablissement: req.user.code_etablissement,
+      search,
+      classe,
+      niveau,
+      statutPaiementFiltre
+    }))
   } catch (err) {
     console.error('[eleves] erreur export bilan:', err.message)
     return res.status(500).json({ error: 'Erreur lors du calcul du bilan' })
@@ -264,6 +312,7 @@ router.put('/:id', requireAuth, async (req, res) => {
     .from('eleves')
     .update(payload)
     .eq('id', id)
+    .eq('code_etablissement', req.user.code_etablissement)
     .select()
     .single()
 
@@ -287,6 +336,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     .from('eleves')
     .select('id, photo_url')
     .eq('id', id)
+    .eq('code_etablissement', req.user.code_etablissement)
     .maybeSingle()
 
   if (erreurRecherche) {
@@ -310,7 +360,11 @@ router.delete('/:id', requireAuth, async (req, res) => {
     }
   }
 
-  const { error } = await supabase.from('eleves').delete().eq('id', id)
+  const { error } = await supabase
+    .from('eleves')
+    .delete()
+    .eq('id', id)
+    .eq('code_etablissement', req.user.code_etablissement)
 
   if (error) {
     console.error('[eleves] erreur suppression:', error.message)
@@ -349,9 +403,23 @@ function estRedoublant(val) {
 }
 
 // GET /api/eleves/modele  → télécharge un fichier .xlsx vierge (avec un exemple)
-// reprenant exactement les colonnes attendues (format export ministériel).
-router.get('/modele', requireAuth, (req, res) => {
-  const feuille = XLSX.utils.aoa_to_sheet([COLONNES_MODELE, EXEMPLE_MODELE])
+// reprenant exactement les colonnes attendues (format export ministériel +
+// code/nom établissement). La ligne d'exemple reprend le code et le nom du
+// PROPRE établissement de l'utilisateur connecté quand ils sont déjà
+// configurés (page "Identification de l'établissement"), pour qu'il n'y ait
+// aucune ambiguïté sur ce qu'il faut mettre dans ces deux colonnes.
+router.get('/modele', requireAuth, async (req, res) => {
+  const { data: etab } = await supabase
+    .from('etablissements')
+    .select('code_etablissement, nom')
+    .eq('code_etablissement', req.user.code_etablissement)
+    .maybeSingle()
+
+  const exemple = [...EXEMPLE_MODELE]
+  exemple[0] = etab?.code_etablissement || req.user.code_etablissement || ''
+  exemple[1] = etab?.nom || ''
+
+  const feuille = XLSX.utils.aoa_to_sheet([COLONNES_MODELE, exemple])
   feuille['!cols'] = COLONNES_MODELE.map((c) => ({ wch: Math.max(12, c.length + 2) }))
 
   const workbook = XLSX.utils.book_new()
@@ -365,9 +433,20 @@ router.get('/modele', requireAuth, (req, res) => {
 })
 
 // POST /api/eleves/import  (multipart/form-data, champ "file" = un .xlsx)
-// Le fichier Excel du ministère, tel quel, avec au minimum les colonnes
-// Matricule, Nom, Classe (+ Prénom, Qualité, Statut si présentes).
+// Le fichier Excel (modèle maison ou export ministériel), avec au minimum
+// les colonnes Matricule, Nom, Classe (+ Prénom, Qualité, Statut si présentes).
 // N'importe pas les photos : voir POST /api/eleves/import-photos.
+//
+// GARDE-FOU MULTI-ÉTABLISSEMENT : si le fichier contient une colonne
+// "Code établissement" (ou la colonne ministérielle "CodeEts"), chaque ligne
+// est comparée au code de l'établissement connecté :
+//   - si la GRANDE MAJORITÉ des lignes portent un code différent, le fichier
+//     vient manifestement d'un autre établissement → import refusé en bloc ;
+//   - si seulement une poignée de lignes isolées diffèrent (erreur de frappe
+//     ponctuelle dans le fichier source), ces lignes-là sont simplement
+//     ignorées (comptées en erreur) plutôt que de bloquer tout le reste.
+// Si la colonne est absente (anciens fichiers simplifiés), toutes les lignes
+// sont rattachées à l'établissement connecté, comme avant.
 router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Aucun fichier reçu (champ "file" attendu)' })
@@ -390,6 +469,26 @@ router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res)
     return res.status(400).json({ error: `Fichier Excel illisible : ${err.message}` })
   }
 
+  const monCode = req.user.code_etablissement
+
+  // --- Garde-fou établissement : détecte un fichier importé par erreur ---
+  const codesLignes = rows.map(
+    (row) => String(row['code etablissement'] || row.codeets || row['code_etablissement'] || '').trim()
+  )
+  const lignesAvecCode = codesLignes.filter(Boolean)
+  if (lignesAvecCode.length > 0) {
+    const correspondantes = lignesAvecCode.filter((c) => c === monCode).length
+    const ratioCorrespondant = correspondantes / lignesAvecCode.length
+    // Moins de la moitié des lignes correspondent à mon établissement :
+    // ce fichier vient très probablement d'une autre école, on bloque tout.
+    if (ratioCorrespondant < 0.5) {
+      const autreCode = lignesAvecCode.find((c) => c !== monCode)
+      return res.status(400).json({
+        error: `Ce fichier semble provenir d'un autre établissement (code "${autreCode}" détecté, attendu "${monCode}"). Import annulé — vérifie le fichier avant de réessayer.`
+      })
+    }
+  }
+
   let importes = 0
   let mis_a_jour = 0
   const erreurs = []
@@ -405,6 +504,15 @@ router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res)
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
     const ligne = i + 2 // +2 : ligne 1 = en-têtes, index 0-based
+
+    // Ligne isolée dont le code établissement ne correspond pas au mien
+    // (erreur de frappe ponctuelle dans le fichier source) : on l'ignore
+    // plutôt que de l'importer chez le mauvais établissement.
+    const codeLigne = codesLignes[i]
+    if (codeLigne && codeLigne !== monCode) {
+      erreurs.push(`Ligne ${ligne} : code établissement "${codeLigne}" différent du tien ("${monCode}") — ligne ignorée`)
+      continue
+    }
 
     const matricule = String(row.matricule ?? '').trim()
     const nomSeul = String(row.nom ?? '').trim()
@@ -438,7 +546,7 @@ router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res)
       tel_parent = `0${tel_parent}`
     }
 
-    const payloadCommun = { matricule, nom, classe, niveau, affecte, redoublant }
+    const payloadCommun = { matricule, nom, classe, niveau, affecte, redoublant, code_etablissement: monCode }
     // On ne renseigne parent/tel_parent que s'ils sont présents dans le
     // fichier, pour ne jamais écraser une valeur déjà en base (ex: un
     // ré-import fait avec un fichier simplifié qui ne contient pas ces
@@ -452,13 +560,18 @@ router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res)
   const TAILLE_LOT = 300
 
   try {
-    // 1) On repère en une poignée de requêtes quels matricules existent déjà,
-    // pour distinguer créations et mises à jour (sans faire un SELECT par ligne).
+    // 1) On repère en une poignée de requêtes quels matricules existent déjà
+    // DANS MON ÉTABLISSEMENT, pour distinguer créations et mises à jour
+    // (sans faire un SELECT par ligne).
     const tousMatricules = lignesValides.map((l) => l.matricule)
     const matriculesExistants = new Set()
     for (let i = 0; i < tousMatricules.length; i += TAILLE_LOT) {
       const lot = tousMatricules.slice(i, i + TAILLE_LOT)
-      const { data, error } = await supabase.from('eleves').select('matricule').in('matricule', lot)
+      const { data, error } = await supabase
+        .from('eleves')
+        .select('matricule')
+        .eq('code_etablissement', monCode)
+        .in('matricule', lot)
       if (error) throw error
       for (const r of data || []) matriculesExistants.add(r.matricule)
     }
@@ -466,6 +579,9 @@ router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res)
     // 2) Upsert groupé : "statut" n'est envoyé QUE pour les nouveaux élèves
     // (mis à 'Actif'), jamais pour une mise à jour, afin de ne jamais écraser
     // un statut (Actif/Inactif/Transféré/Exclu) déjà changé manuellement.
+    // onConflict porte sur (code_etablissement, matricule) : le même
+    // matricule peut exister dans deux établissements différents sans
+    // jamais se marcher dessus.
     for (let i = 0; i < lignesValides.length; i += TAILLE_LOT) {
       const lot = lignesValides.slice(i, i + TAILLE_LOT)
       const payloadLot = lot.map(({ matricule, payloadCommun }) => {
@@ -473,7 +589,9 @@ router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res)
         return estNouveau ? { ...payloadCommun, statut: 'Actif' } : payloadCommun
       })
 
-      const { error } = await supabase.from('eleves').upsert(payloadLot, { onConflict: 'matricule' })
+      const { error } = await supabase
+        .from('eleves')
+        .upsert(payloadLot, { onConflict: 'code_etablissement,matricule' })
       if (error) {
         for (const { ligne, matricule } of lot) {
           erreurs.push(`Ligne ${ligne} (${matricule}) : ${error.message}`)
@@ -528,6 +646,7 @@ router.post('/import-photos', requireAuth, uploadZip.array('photos', 200), async
       const { data: existant, error: erreurRecherche } = await supabase
         .from('eleves')
         .select('id, matricule')
+        .eq('code_etablissement', req.user.code_etablissement)
         .ilike('matricule', matricule)
         .maybeSingle()
 
@@ -539,7 +658,9 @@ router.post('/import-photos', requireAuth, uploadZip.array('photos', 200), async
       }
 
       const ext = (nomFichier.split('.').pop() || 'jpg').toLowerCase()
-      const chemin = `${existant.matricule}.${ext}`
+      // Le chemin de stockage inclut le code établissement pour ne jamais
+      // faire collision entre deux écoles ayant un élève au même matricule.
+      const chemin = `${req.user.code_etablissement}/${existant.matricule}.${ext}`
 
       const { error: uploadError } = await supabase.storage
         .from(PHOTOS_BUCKET)

@@ -26,6 +26,7 @@ router.get('/recherche', async (req, res) => {
   const { data: eleve, error: errEleve } = await supabase
     .from('eleves')
     .select('*')
+    .eq('code_etablissement', req.user.code_etablissement)
     .ilike('matricule', matricule)
     .maybeSingle()
 
@@ -40,6 +41,7 @@ router.get('/recherche', async (req, res) => {
   const { data: tarif } = await supabase
     .from('tarifs')
     .select('*')
+    .eq('code_etablissement', req.user.code_etablissement)
     .eq('niveau', eleve.niveau)
     .maybeSingle()
 
@@ -73,6 +75,7 @@ router.post('/', async (req, res) => {
     .from('eleves')
     .select('id, matricule, niveau, affecte')
     .eq('id', eleve_id)
+    .eq('code_etablissement', req.user.code_etablissement)
     .maybeSingle()
 
   if (errEleve || !eleve) {
@@ -99,7 +102,8 @@ router.post('/', async (req, res) => {
       pourcentage: pourcentageNum,
       motif: motif || null,
       accordee_par: req.user.nom || req.user.role,
-      statut: 'active'
+      statut: 'active',
+      code_etablissement: req.user.code_etablissement
     })
     .select()
     .single()
@@ -112,6 +116,7 @@ router.post('/', async (req, res) => {
   const { data: tarif } = await supabase
     .from('tarifs')
     .select('*')
+    .eq('code_etablissement', req.user.code_etablissement)
     .eq('niveau', eleve.niveau)
     .maybeSingle()
 
@@ -127,6 +132,7 @@ router.post('/:id/annuler', async (req, res) => {
     .from('reductions')
     .select('*')
     .eq('id', req.params.id)
+    .eq('code_etablissement', req.user.code_etablissement)
     .maybeSingle()
 
   if (errLecture || !reduction) {

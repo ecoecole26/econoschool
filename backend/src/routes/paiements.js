@@ -18,6 +18,7 @@ router.get('/recherche', requireAuth, async (req, res) => {
   const { data: eleve, error: errEleve } = await supabase
     .from('eleves')
     .select('*')
+    .eq('code_etablissement', req.user.code_etablissement)
     .ilike('matricule', matricule)
     .maybeSingle()
 
@@ -32,6 +33,7 @@ router.get('/recherche', requireAuth, async (req, res) => {
   const { data: tarif } = await supabase
     .from('tarifs')
     .select('*')
+    .eq('code_etablissement', req.user.code_etablissement)
     .eq('niveau', eleve.niveau)
     .maybeSingle()
 
@@ -67,6 +69,7 @@ router.get('/tranches', requireAuth, async (req, res) => {
   const { data: types, error: err1 } = await supabase
     .from('types_frais')
     .select('id, nom, ordre')
+    .eq('code_etablissement', req.user.code_etablissement)
     .order('ordre', { ascending: true })
 
   if (err1) return res.status(500).json({ error: err1.message })
@@ -74,11 +77,12 @@ router.get('/tranches', requireAuth, async (req, res) => {
   const { data: tranches, error: err2 } = await supabase
     .from('tranches_frais')
     .select('*')
+    .in('type_frais_id', (types || []).map((t) => t.id))
     .order('ordre', { ascending: true })
 
   if (err2) return res.status(500).json({ error: err2.message })
 
-  const result = tranches.map((t) => {
+  const result = (tranches || []).map((t) => {
     const type = types.find((ty) => ty.id === t.type_frais_id)
     return { id: t.id, label: `${type?.nom || '—'} — ${t.label}`, date_echeance: t.date_echeance }
   })
@@ -99,6 +103,7 @@ router.post('/', requireAuth, async (req, res) => {
     .from('eleves')
     .select('id, matricule, nom, tel_parent, parent')
     .eq('id', eleve_id)
+    .eq('code_etablissement', req.user.code_etablissement)
     .maybeSingle()
 
   if (errEleve || !eleve) {
@@ -108,7 +113,7 @@ router.post('/', requireAuth, async (req, res) => {
   // Un paiement crédite TOUJOURS la caisse : si elle est fermée ou en pause,
   // on bloque avant même de créer le paiement, plutôt que d'enregistrer un
   // paiement dont l'argent ne rentre nulle part.
-  const caisse = await getOrCreateCaisse('principale', req.user.etablissement)
+  const caisse = await getOrCreateCaisse('principale', req.user.code_etablissement)
   if (caisse.statut !== 'ouverte') {
     return res.status(409).json({
       error: `${LABEL_CAISSE[caisse.type_caisse]} fermée ou en pause : ouvrez-la avant d'encaisser un paiement.`
@@ -123,7 +128,8 @@ router.post('/', requireAuth, async (req, res) => {
       tranche_libelle: tranche_libelle || null,
       montant: montantNum,
       date_paiement: date_paiement || new Date().toISOString().slice(0, 10),
-      valide_par: req.user.nom || req.user.role
+      valide_par: req.user.nom || req.user.role,
+      code_etablissement: req.user.code_etablissement
     })
     .select()
     .single()
@@ -141,7 +147,7 @@ router.post('/', requireAuth, async (req, res) => {
     await crediterCaisseParPaiement({
       montant: montantNum,
       libelle: `Paiement ${eleve.matricule} — ${tranche_libelle || 'frais'}`,
-      etablissement: req.user.etablissement
+      code_etablissement: req.user.code_etablissement
     })
   } catch (errCaisse) {
     console.error('[paiements] erreur crédit caisse:', errCaisse.message)

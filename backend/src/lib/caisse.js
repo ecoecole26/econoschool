@@ -14,6 +14,9 @@ import { supabase } from '../config/supabase.js'
 // n'affiche plus qu'"une seule caisse" à l'écran. Les réductions sont
 // gérées à part (page Réductions, table `reductions`), plus comme un
 // mouvement de caisse.
+//
+// MULTI-ÉTABLISSEMENT : chaque établissement a sa propre ligne `caisses`
+// (une par type_caisse ET par code_etablissement) — voir migration 014.
 export const TYPES_CAISSE = ['principale']
 
 export const TYPE_ENCAISSEMENT = 'Encaissement'
@@ -43,13 +46,14 @@ export function roleAAccesOperation(role, type_operation) {
   return true
 }
 
-// Renvoie la caisse (ligne de la table `caisses`), en la créant avec un
-// solde de 0 si elle n'existe pas encore pour cet établissement.
-export async function getOrCreateCaisse(type_caisse, etablissement) {
+// Renvoie la caisse (ligne de la table `caisses`) DE CET ÉTABLISSEMENT, en
+// la créant avec un solde de 0 si elle n'existe pas encore pour lui.
+export async function getOrCreateCaisse(type_caisse, code_etablissement) {
   const { data: existante, error: errLecture } = await supabase
     .from('caisses')
     .select('*')
     .eq('type_caisse', type_caisse)
+    .eq('code_etablissement', code_etablissement)
     .maybeSingle()
 
   if (errLecture) throw new Error(errLecture.message)
@@ -59,7 +63,7 @@ export async function getOrCreateCaisse(type_caisse, etablissement) {
     .from('caisses')
     .insert({
       type_caisse,
-      etablissement: etablissement || null,
+      code_etablissement: code_etablissement || null,
       statut: 'ouverte',
       solde: 0
     })
@@ -83,12 +87,12 @@ export async function enregistrerMouvementCaisse({
   montant,
   libelle,
   date,
-  etablissement,
+  code_etablissement,
   annee_scolaire,
   nom,
   ignorerStatut = false
 }) {
-  const caisse = await getOrCreateCaisse(type_caisse, etablissement)
+  const caisse = await getOrCreateCaisse(type_caisse, code_etablissement)
   const montantNum = Number(montant)
 
   // Vérification centralisée : quel que soit le point d'entrée (bouton
@@ -106,7 +110,7 @@ export async function enregistrerMouvementCaisse({
   const { data: mouvement, error: errJournal } = await supabase
     .from('journal_caisse')
     .insert({
-      etablissement: etablissement || null,
+      code_etablissement: code_etablissement || null,
       caisse: type_caisse,
       type_operation,
       montant: montantNum,
@@ -142,8 +146,8 @@ export async function enregistrerMouvementCaisse({
 
 // Change le statut d'une caisse (ouverte / fermee / pause) et trace qui a
 // fait l'action et quand. Retourne la caisse mise à jour.
-export async function changerStatutCaisse({ type_caisse, statut, etablissement, nom }) {
-  const caisse = await getOrCreateCaisse(type_caisse, etablissement)
+export async function changerStatutCaisse({ type_caisse, statut, code_etablissement, nom }) {
+  const caisse = await getOrCreateCaisse(type_caisse, code_etablissement)
   const maintenant = new Date().toISOString()
 
   const payload = { statut, updated_at: maintenant }
@@ -170,12 +174,12 @@ export async function changerStatutCaisse({ type_caisse, statut, etablissement, 
 // Envoie une notification en base aux rôles indiqués (sauf à l'auteur de
 // l'action lui-même). Utilisé pour prévenir le Proviseur et le Fondateur
 // quand l'Économe ouvre une caisse.
-export async function notifierRoles({ roles, etablissement, titre, message, sauf_role }) {
+export async function notifierRoles({ roles, code_etablissement, titre, message, sauf_role }) {
   const destinataires = roles.filter((r) => r !== sauf_role)
   if (destinataires.length === 0) return
 
   const lignes = destinataires.map((destinataire_role) => ({
-    etablissement: etablissement || null,
+    code_etablissement: code_etablissement || null,
     destinataire_role,
     titre,
     message
@@ -187,13 +191,13 @@ export async function notifierRoles({ roles, etablissement, titre, message, sauf
 
 // Crédite la caisse lors d'un paiement élève. Retourne le résultat de
 // enregistrerMouvementCaisse (mouvement + caisse à jour).
-export async function crediterCaisseParPaiement({ montant, libelle, etablissement, annee_scolaire }) {
+export async function crediterCaisseParPaiement({ montant, libelle, code_etablissement, annee_scolaire }) {
   return enregistrerMouvementCaisse({
     type_caisse: 'principale',
     type_operation: TYPE_ENCAISSEMENT,
     montant,
     libelle,
-    etablissement,
+    code_etablissement,
     annee_scolaire,
     nom: 'Système (paiement)'
   })

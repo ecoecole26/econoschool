@@ -39,10 +39,10 @@ async function requestMultipart(path, formData) {
 }
 
 export const api = {
-  login: (role, password) =>
+  login: (role, password, code_etablissement) =>
     request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ role, password })
+      body: JSON.stringify({ role, password, code_etablissement })
     }),
 
   getEleves: (params = {}) => {
@@ -125,7 +125,8 @@ export const api = {
     request('/etablissement', { method: 'PUT', body: JSON.stringify(payload) }),
 
   getComptes: () => request('/utilisateurs'),
-  getBootstrapStatus: () => request('/utilisateurs/bootstrap-status'),
+  getBootstrapStatus: (code_etablissement) =>
+    request(`/utilisateurs/bootstrap-status?code_etablissement=${encodeURIComponent(code_etablissement || '')}`),
   saveCompte: (role, payload) =>
     request(`/utilisateurs/${role}`, { method: 'PUT', body: JSON.stringify(payload) }),
 
