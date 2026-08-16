@@ -132,9 +132,14 @@ async function handleSave(req, res, code_etablissement, { bootstrap }) {
       .maybeSingle()
 
     if (!etabExistant) {
+      // La colonne `id` de `etablissements` est de type texte, sans valeur
+      // par défaut (héritage de l'ancien projet) : il faut toujours lui
+      // fournir une valeur explicite. On utilise le code établissement
+      // (garanti unique) plutôt que le nom, qui pourrait un jour se
+      // répéter entre deux écoles différentes.
       const { error: errEtab } = await supabase
         .from('etablissements')
-        .insert({ code_etablissement, nom: nom_etablissement })
+        .insert({ id: code_etablissement, code_etablissement, nom: nom_etablissement })
       if (errEtab) {
         console.error('[utilisateurs] erreur création établissement:', errEtab.message)
         return res.status(500).json({ error: "Erreur lors de la création de l'établissement" })
