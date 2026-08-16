@@ -7,6 +7,70 @@ import { api } from '../lib/api.js'
 
 const TAILLE_LOT = 25 // photos envoyées par requête — reste léger pour le serveur
 
+// Largeur/hauteur cible pour les photos élève, format "carte d'identité"
+// (portrait 3:4). Recadrer et compresser CÔTÉ NAVIGATEUR avant l'envoi sert
+// deux objectifs à la fois :
+//  1) uniformiser le rendu (trombinoscope, fiches, reçus) avec de vraies
+//     photos type carte d'identité, cadrées sur le visage ;
+//  2) faire chuter le poids de chaque photo de plusieurs Mo (scan/appareil
+//     photo) à quelques dizaines de Ko — ce qui évite de dépasser la limite
+//     de taille de requête imposée par Vercel (~4,5 Mo) quand plusieurs
+//     photos sont envoyées ensemble dans un même lot (l'erreur "Failed to
+//     fetch" pendant l'import des photos vient de là : la requête est coupée
+//     en plein transfert avant même d'atteindre le serveur).
+const LARGEUR_PHOTO = 300
+const HAUTEUR_PHOTO = 400
+
+function redimensionnerPhoto(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    const url = URL.createObjectURL(file)
+    image.onload = () => {
+      URL.revokeObjectURL(url)
+      const canvas = document.createElement('canvas')
+      canvas.width = LARGEUR_PHOTO
+      canvas.height = HAUTEUR_PHOTO
+      const ctx = canvas.getContext('2d')
+
+      // Recadrage "cover" ancré en haut (le visage est presque toujours dans
+      // la moitié haute de la photo) : on redimensionne l'image pour qu'elle
+      // couvre entièrement le cadre 3:4, puis on ne garde que le haut si elle
+      // déborde en hauteur, les côtés si elle déborde en largeur.
+      const ratioCible = LARGEUR_PHOTO / HAUTEUR_PHOTO
+      const ratioSource = image.width / image.height
+      let sx, sy, sw, sh
+      if (ratioSource > ratioCible) {
+        // Image plus large que le cadre : on rogne les côtés, centré.
+        sh = image.height
+        sw = sh * ratioCible
+        sx = (image.width - sw) / 2
+        sy = 0
+      } else {
+        // Image plus haute que le cadre : on rogne le bas, ancré en haut.
+        sw = image.width
+        sh = sw / ratioCible
+        sx = 0
+        sy = 0
+      }
+
+      ctx.drawImage(image, sx, sy, sw, sh, 0, 0, LARGEUR_PHOTO, HAUTEUR_PHOTO)
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error('Échec du traitement de la photo'))
+          resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }))
+        },
+        'image/jpeg',
+        0.85
+      )
+    }
+    image.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Photo illisible'))
+    }
+    image.src = url
+  })
+}
+
 // Petit badge coloré pour les résultats d'import (créés / mis à jour / erreurs...).
 function Badge({ children, className }) {
   return (
@@ -108,7 +172,15 @@ export default function ImportEleves() {
           lot.map(async (entree) => {
             const blob = await entree.async('blob')
             const nom = entree.name.split('/').pop()
-            return new File([blob], nom, { type: blob.type || 'image/jpeg' })
+            const brut = new File([blob], nom, { type: blob.type || 'image/jpeg' })
+            try {
+              return await redimensionnerPhoto(brut)
+            } catch {
+              // Si le redimensionnement échoue pour une raison quelconque
+              // (format exotique...), on envoie la photo telle quelle plutôt
+              // que de bloquer tout le lot.
+              return brut
+            }
           })
         )
 
@@ -242,6 +314,11 @@ export default function ImportEleves() {
             Regroupez toutes les photos dans un seul fichier <b>.zip</b>. Chaque photo doit être
             nommée avec le <b>matricule exact</b> de l'élève (ex : <span className="font-mono">21421986V.jpg</span>).
             La photo est associée automatiquement à l'élève déjà importé.
+          </p>
+          <p className="text-xs text-[#6b7d74] mb-3">
+            📐 Chaque photo est automatiquement recadrée en format carte d'identité (portrait,
+            centrée sur le visage) et compressée avant l'envoi — inutile de les retoucher toi-même
+            au préalable, même des photos très lourdes ou en paysage passent sans problème.
           </p>
 
           <div className="border-2 border-dashed border-[#d7e8de] rounded-xl p-6 text-center mb-4">

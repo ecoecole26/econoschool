@@ -202,14 +202,14 @@ export default function Eleves() {
           ) : eleves.length === 0 ? (
             <div className="text-center text-sm text-[#6b7d74] py-16">Aucun élève trouvé.</div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="flex flex-wrap justify-center gap-3.5">
               {eleves.map((el) => (
                 <div
                   key={el.id}
-                  className="text-center cursor-pointer group"
+                  className="w-[110px] text-center cursor-pointer group"
                   onClick={() => setSelected(el)}
                 >
-                  <div className="w-full aspect-[3/4] rounded-xl overflow-hidden bg-[#eef6f1] border border-[#e3ebe6] mb-1.5">
+                  <div className="w-full aspect-[3/4] rounded-lg overflow-hidden bg-[#eef6f1] border border-[#e3ebe6] mb-1.5 shadow-sm">
                     {el.photo_url ? (
                       <img
                         src={el.photo_url}
@@ -217,13 +217,13 @@ export default function Eleves() {
                         className="w-full h-full object-cover object-top"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-2xl text-[#a9bcb2]">
+                      <div className="w-full h-full flex items-center justify-center text-xl text-[#a9bcb2]">
                         🧑‍🎓
                       </div>
                     )}
                   </div>
-                  <div className="text-xs font-semibold text-vert-fonce truncate">{el.nom}</div>
-                  <div className="text-[11px] text-[#6b7d74] truncate">{el.classe}</div>
+                  <div className="text-[11px] font-semibold text-vert-fonce truncate leading-tight">{el.nom}</div>
+                  <div className="text-[10px] text-[#6b7d74] truncate">{el.classe}</div>
                 </div>
               ))}
             </div>
