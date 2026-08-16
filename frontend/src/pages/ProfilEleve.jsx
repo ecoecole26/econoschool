@@ -28,6 +28,14 @@ export default function ProfilEleve() {
   const [donnees, setDonnees] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [etablissement, setEtablissement] = useState(null)
+
+  useEffect(() => {
+    api
+      .getEtablissement()
+      .then((res) => setEtablissement(res.etablissement))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     let annule = false
@@ -50,6 +58,7 @@ export default function ProfilEleve() {
   }, [matricule])
 
   return (
+    <>
     <Layout title="Profil élève">
       <div className="mb-6 flex items-center justify-between">
         <div>
@@ -68,12 +77,20 @@ export default function ProfilEleve() {
             ← Retour
           </button>
           {donnees && (
-            <Link
-              to="/paiements"
-              className="px-4 py-2 rounded-xl bg-vert-fonce text-white text-sm font-semibold"
-            >
-              💳 Encaisser un paiement
-            </Link>
+            <>
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 rounded-xl border border-[#d7e8de] text-vert-fonce text-sm font-semibold flex items-center gap-1.5"
+              >
+                🖨️ Imprimer
+              </button>
+              <Link
+                to="/paiements"
+                className="px-4 py-2 rounded-xl bg-vert-fonce text-white text-sm font-semibold"
+              >
+                💳 Encaisser un paiement
+              </Link>
+            </>
           )}
         </div>
       </div>
@@ -216,6 +233,145 @@ export default function ProfilEleve() {
         </div>
       )}
     </Layout>
+
+      {/* Bloc dédié à l'impression : invisible à l'écran, affiché uniquement sur la feuille
+          imprimée. Placé hors de <Layout> (donc hors de #app-shell) pour le même motif que
+          le reçu de paiement dans Paiements.jsx : le display:none sur #app-shell à l'impression
+          ne doit pas non plus cacher ce bloc, et on évite tout espace vide résiduel en haut. */}
+      {donnees && (
+        <div className="hidden print:block">
+          <FicheImpression
+            donnees={donnees}
+            etablissement={etablissement}
+            formatFCFA={formatFCFA}
+            formatDate={formatDate}
+          />
+        </div>
+      )}
+    </>
+  )
+}
+
+function FicheImpression({ donnees, etablissement, formatFCFA, formatDate }) {
+  return (
+    <div className="text-sm text-[#132a1e] p-1">
+      {/* En-tête établissement */}
+      <div className="flex items-center gap-3 pb-3 border-b-2 border-vert-fonce mb-4">
+        {etablissement?.logo_url ? (
+          <img
+            src={etablissement.logo_url}
+            alt="Logo"
+            className="w-14 h-14 rounded-full object-cover border border-[#e3ebe6]"
+          />
+        ) : (
+          <div className="w-14 h-14 rounded-full bg-teal-light flex items-center justify-center text-2xl">
+            🏫
+          </div>
+        )}
+        <div>
+          <div className="font-display font-bold text-vert-fonce text-base">
+            {etablissement?.nom || 'Établissement'}
+          </div>
+          <div className="text-xs text-[#6b7d74]">
+            {[etablissement?.adresse, etablissement?.ville].filter(Boolean).join(', ')}
+          </div>
+          {etablissement?.telephone && (
+            <div className="text-xs text-[#6b7d74]">Tél : {etablissement.telephone}</div>
+          )}
+        </div>
+      </div>
+
+      <div className="text-center mb-4">
+        <span className="inline-block px-4 py-1 rounded-full bg-teal-light text-teal text-xs font-bold uppercase tracking-wide">
+          Fiche élève — Historique des versements
+        </span>
+      </div>
+
+      {/* Élève */}
+      <div className="flex items-center gap-3 mb-4 bg-[#f6f8f7] rounded-xl p-3">
+        <div className="w-14 h-14 rounded-full bg-white overflow-hidden flex items-center justify-center text-xl border border-[#e3ebe6]">
+          {donnees.eleve.photo_url ? (
+            <img
+              src={donnees.eleve.photo_url}
+              alt={donnees.eleve.nom}
+              className="w-full h-full object-cover object-top"
+            />
+          ) : (
+            '🧑‍🎓'
+          )}
+        </div>
+        <div>
+          <div className="font-display font-bold text-vert-fonce">{donnees.eleve.nom}</div>
+          <div className="text-xs text-[#6b7d74]">
+            {donnees.eleve.matricule} · {donnees.eleve.classe || '—'} ·{' '}
+            {donnees.eleve.affecte ? 'Affecté' : 'Non affecté'}
+          </div>
+        </div>
+      </div>
+
+      {/* Bilan financier */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="bg-[#f6f8f7] rounded-lg p-2.5 text-center">
+          <div className="text-[10px] font-semibold text-[#9aa8a1] uppercase mb-0.5">
+            Total à payer
+          </div>
+          <div className="text-base font-display font-bold text-vert-fonce">
+            {formatFCFA(donnees.frais.total_du)}
+          </div>
+        </div>
+        <div className="bg-teal-light rounded-lg p-2.5 text-center">
+          <div className="text-[10px] font-semibold text-[#9aa8a1] uppercase mb-0.5">
+            Total payé
+          </div>
+          <div className="text-base font-display font-bold text-teal">
+            {formatFCFA(donnees.totalPaye)}
+          </div>
+        </div>
+        <div className="bg-[#fff1e0] rounded-lg p-2.5 text-center">
+          <div className="text-[10px] font-semibold text-[#9aa8a1] uppercase mb-0.5">
+            Reste à payer
+          </div>
+          <div className="text-base font-display font-bold text-orange">
+            {formatFCFA(donnees.reste_a_payer)}
+          </div>
+        </div>
+      </div>
+
+      {/* Historique complet */}
+      <div className="border-t border-[#e3ebe6] pt-3">
+        <h4 className="text-sm font-display font-bold text-vert-fonce mb-2">
+          Historique complet des versements ({donnees.paiements.length})
+        </h4>
+        {donnees.paiements.length === 0 ? (
+          <p className="text-sm text-[#9aa8a1]">Aucun versement enregistré pour le moment.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
+                <th className="py-1.5 pr-2">Date</th>
+                <th className="py-1.5 pr-2">Tranche</th>
+                <th className="py-1.5 pr-2 text-right">Montant</th>
+                <th className="py-1.5 pr-2">Validé par</th>
+              </tr>
+            </thead>
+            <tbody>
+              {donnees.paiements.map((p) => (
+                <tr key={p.id} className="border-b border-[#f1f5f2]">
+                  <td className="py-1.5 pr-2">{formatDate(p.date_paiement)}</td>
+                  <td className="py-1.5 pr-2">{p.tranche_libelle || '—'}</td>
+                  <td className="py-1.5 pr-2 text-right font-medium">{formatFCFA(p.montant)}</td>
+                  <td className="py-1.5 pr-2">{p.valide_par || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="text-center text-[10px] text-[#9aa8a1] mt-6 pt-3 border-t border-[#f1f5f2]">
+        Édité le {formatDate(new Date().toISOString())} — EconoSchool
+      </div>
+    </div>
   )
 }
 
