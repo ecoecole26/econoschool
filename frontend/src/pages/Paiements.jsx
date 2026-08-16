@@ -35,6 +35,8 @@ export default function Paiements() {
   const [recuOuvert, setRecuOuvert] = useState(false)
   const [dernierPaiement, setDernierPaiement] = useState(null) // { montant, tranche_libelle, date_paiement, valide_par }
   const [caissesIndisponibles, setCaissesIndisponibles] = useState([]) // ['Caisse', ...] si fermée/pause
+  const [kits, setKits] = useState({ kit_rame: false, kit_eps: false, kit_autres: false })
+  const [kitsSaving, setKitsSaving] = useState(false)
 
   const LABEL_CAISSE = { principale: 'Caisse' }
 
@@ -77,6 +79,11 @@ export default function Paiements() {
       setDonnees(res)
       setMontant('')
       setTrancheChoisie('')
+      setKits({
+        kit_rame: !!res.eleve.kit_rame,
+        kit_eps: !!res.eleve.kit_eps,
+        kit_autres: !!res.eleve.kit_autres
+      })
     } catch (err) {
       setError(err.message || 'Élève introuvable')
     } finally {
@@ -113,6 +120,23 @@ export default function Paiements() {
       setMessage(err.message || "Erreur lors de l'enregistrement")
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function toggleKit(champ) {
+    if (!donnees) return
+    const nouvelleValeur = !kits[champ]
+    setKits((k) => ({ ...k, [champ]: nouvelleValeur }))
+    setKitsSaving(true)
+    try {
+      await api.majKitsEleve(donnees.eleve.id, { [champ]: nouvelleValeur })
+    } catch (err) {
+      // En cas d'échec, on revient à l'état précédent pour ne pas afficher
+      // une coche qui n'a en réalité pas été enregistrée.
+      setKits((k) => ({ ...k, [champ]: !nouvelleValeur }))
+      setMessage(err.message || "Erreur lors de l'enregistrement du kit")
+    } finally {
+      setKitsSaving(false)
     }
   }
 
@@ -337,6 +361,42 @@ export default function Paiements() {
                   {smsInfo.envoye ? 'SMS envoyé au parent 📩' : `SMS non envoyé : ${smsInfo.motif || 'raison inconnue'}`}
                 </div>
               )}
+
+              <div className="mb-4 border border-[#e3ebe6] rounded-xl px-4 py-3 bg-[#f6f8f7]">
+                <div className="text-xs font-semibold text-[#6b7d74] uppercase mb-2 flex items-center gap-2">
+                  Kits remis à l'inscription
+                  {kitsSaving && <span className="text-[10px] normal-case text-[#9aa8a1]">enregistrement…</span>}
+                </div>
+                <div className="flex flex-wrap gap-x-8 gap-y-2">
+                  <label className="flex items-center gap-2 text-sm text-vert-fonce cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={kits.kit_rame}
+                      onChange={() => toggleKit('kit_rame')}
+                      className="w-4 h-4 accent-vert-fonce"
+                    />
+                    Paquet rames
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-vert-fonce cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={kits.kit_eps}
+                      onChange={() => toggleKit('kit_eps')}
+                      className="w-4 h-4 accent-vert-fonce"
+                    />
+                    Kit EPS
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-vert-fonce cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={kits.kit_autres}
+                      onChange={() => toggleKit('kit_autres')}
+                      className="w-4 h-4 accent-vert-fonce"
+                    />
+                    Autres
+                  </label>
+                </div>
+              </div>
 
               <div className="flex items-center gap-3">
                 <button

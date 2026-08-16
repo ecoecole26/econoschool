@@ -322,7 +322,63 @@ router.put('/:id', requireAuth, async (req, res) => {
   res.json({ eleve: data })
 })
 
-// DELETE /api/eleves/:id
+// PATCH /api/eleves/:id/kits  { kit_rame, kit_eps, kit_autres }
+// Coche/décoche les kits remis à l'inscription (paquet de rames, kit EPS,
+// autres). Indépendant du paiement : on peut cocher un kit sans forcément
+// encaisser d'argent au même moment. Bascule immédiatement l'élève dans (ou
+// hors de) la liste visible sur la page "Kit inscription".
+router.patch('/:id/kits', requireAuth, async (req, res) => {
+  const { id } = req.params
+  const payload = {}
+  for (const champ of ['kit_rame', 'kit_eps', 'kit_autres']) {
+    if (req.body?.[champ] !== undefined) payload[champ] = !!req.body[champ]
+  }
+  if (Object.keys(payload).length === 0) {
+    return res.status(400).json({ error: 'Aucun kit à mettre à jour' })
+  }
+
+  const { data, error } = await supabase
+    .from('eleves')
+    .update(payload)
+    .eq('id', id)
+    .eq('code_etablissement', req.user.code_etablissement)
+    .select('id, kit_rame, kit_eps, kit_autres')
+    .single()
+
+  if (error) {
+    console.error('[eleves] erreur maj kits:', error.message)
+    return res.status(500).json({ error: 'Erreur lors de la mise à jour des kits' })
+  }
+
+  res.json({ eleve: data })
+})
+
+// GET /api/eleves/kits?search=&classe=
+// Liste complète (non paginée) DE MON ÉTABLISSEMENT pour la page
+// "Kit inscription" : qui a reçu quoi, filtrable par classe, pour impression
+// classe par classe et remise au Fondateur.
+router.get('/kits', requireAuth, async (req, res) => {
+  const { search = '', classe = '' } = req.query
+
+  try {
+    const eleves = await fetchTout((from, to) => {
+      let q = supabase
+        .from('eleves')
+        .select('id, matricule, nom, classe, niveau, kit_rame, kit_eps, kit_autres')
+        .eq('code_etablissement', req.user.code_etablissement)
+        .order('classe', { ascending: true })
+        .order('nom', { ascending: true })
+      if (search) q = q.or(`nom.ilike.%${search}%,matricule.ilike.%${search}%`)
+      if (classe) q = q.ilike('classe', `%${classe}%`)
+      return q.range(from, to)
+    })
+
+    res.json({ eleves: eleves || [] })
+  } catch (err) {
+    console.error('[eleves] erreur liste kits:', err.message)
+    res.status(500).json({ error: 'Erreur lors de la lecture des kits' })
+  }
+})
 router.delete('/:id', requireAuth, async (req, res) => {
   if (req.user.role !== 'fondateur') {
     return res.status(403).json({ error: 'Seul le Fondateur peut supprimer un élève' })

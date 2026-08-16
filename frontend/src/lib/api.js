@@ -49,6 +49,12 @@ export const api = {
     const qs = new URLSearchParams(params).toString()
     return request(`/eleves${qs ? `?${qs}` : ''}`)
   },
+  getKitsEleves: (params = {}) => {
+    const qs = new URLSearchParams(params).toString()
+    return request(`/eleves/kits${qs ? `?${qs}` : ''}`)
+  },
+  majKitsEleve: (id, payload) =>
+    request(`/eleves/${id}/kits`, { method: 'PATCH', body: JSON.stringify(payload) }),
   getBilanEleves: (params = {}) => {
     const qs = new URLSearchParams(params).toString()
     return request(`/eleves/bilan${qs ? `?${qs}` : ''}`)

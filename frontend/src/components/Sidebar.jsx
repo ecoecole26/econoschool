@@ -22,6 +22,7 @@ const NAV_SECTIONS = [
     items: [
       { to: '/eleves', label: 'Élèves', icon: '🧑‍🎓' },
       { to: '/paiements', label: 'Paiements', icon: '💳' },
+      { to: '/kit-inscription', label: 'Kit inscription', icon: '🎒' },
       { to: '/reductions', label: 'Réductions', icon: '🎁' },
       { to: '/caisse', label: 'Caisse', icon: '🗃️' },
       { to: '/entrees', label: 'Entrées', icon: '📥' },

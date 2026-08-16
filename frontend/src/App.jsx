@@ -18,6 +18,7 @@ import TableauDeBord from './pages/TableauDeBord.jsx'
 import Rapports from './pages/Rapports.jsx'
 import BilanPeriodique from './pages/BilanPeriodique.jsx'
 import DateButoir from './pages/DateButoir.jsx'
+import KitInscription from './pages/KitInscription.jsx'
 
 function RequireAuth({ children }) {
   const token = localStorage.getItem('econoschool_token')
@@ -54,6 +55,7 @@ export default function App() {
       <Route path="/eleves/:matricule/profil" element={protect(<ProfilEleve />)} />
       <Route path="/bilan" element={protect(<BilanPeriodique />)} />
       <Route path="/butoir" element={protect(<DateButoir />)} />
+      <Route path="/kit-inscription" element={protect(<KitInscription />)} />
     </Routes>
   )
 }
