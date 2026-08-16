@@ -24,17 +24,19 @@ const TYPES_FRAIS_DEFAUT = [
 ]
 
 export async function seedNouvelEtablissement(code_etablissement) {
-  await supabase
+  const { error: errTarifs } = await supabase
     .from('tarifs')
     .upsert(
       NIVEAUX_DEFAUT.map((n) => ({ ...n, code_etablissement })),
       { onConflict: 'code_etablissement,niveau', ignoreDuplicates: true }
     )
+  if (errTarifs) console.error('[seedEtablissement] erreur seed tarifs:', errTarifs.message)
 
-  await supabase
+  const { error: errTypes } = await supabase
     .from('types_frais')
     .upsert(
       TYPES_FRAIS_DEFAUT.map((t) => ({ ...t, code_etablissement })),
       { onConflict: 'code_etablissement,code', ignoreDuplicates: true }
     )
+  if (errTypes) console.error('[seedEtablissement] erreur seed types_frais:', errTypes.message)
 }
