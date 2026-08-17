@@ -362,58 +362,60 @@ export default function Paiements() {
                 </div>
               )}
 
-              <div className="mb-4 border border-[#e3ebe6] rounded-xl px-4 py-3 bg-[#f6f8f7]">
-                <div className="text-xs font-semibold text-[#6b7d74] uppercase mb-2 flex items-center gap-2">
-                  Kits remis à l'inscription
-                  {kitsSaving && <span className="text-[10px] normal-case text-[#9aa8a1]">enregistrement…</span>}
+              <div className="flex flex-wrap items-center justify-between gap-4 border border-[#e3ebe6] rounded-xl px-4 py-3 bg-[#f6f8f7]">
+                <div>
+                  <div className="text-xs font-semibold text-[#6b7d74] uppercase mb-2 flex items-center gap-2">
+                    Kits remis à l'inscription
+                    {kitsSaving && <span className="text-[10px] normal-case text-[#9aa8a1]">enregistrement…</span>}
+                  </div>
+                  <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    <label className="flex items-center gap-2 text-sm text-vert-fonce cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={kits.kit_rame}
+                        onChange={() => toggleKit('kit_rame')}
+                        className="w-4 h-4 accent-vert-fonce"
+                      />
+                      Paquet rames
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-vert-fonce cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={kits.kit_eps}
+                        onChange={() => toggleKit('kit_eps')}
+                        className="w-4 h-4 accent-vert-fonce"
+                      />
+                      Kit EPS
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-vert-fonce cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={kits.kit_autres}
+                        onChange={() => toggleKit('kit_autres')}
+                        className="w-4 h-4 accent-vert-fonce"
+                      />
+                      Autres
+                    </label>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-x-8 gap-y-2">
-                  <label className="flex items-center gap-2 text-sm text-vert-fonce cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={kits.kit_rame}
-                      onChange={() => toggleKit('kit_rame')}
-                      className="w-4 h-4 accent-vert-fonce"
-                    />
-                    Paquet rames
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-vert-fonce cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={kits.kit_eps}
-                      onChange={() => toggleKit('kit_eps')}
-                      className="w-4 h-4 accent-vert-fonce"
-                    />
-                    Kit EPS
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-vert-fonce cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={kits.kit_autres}
-                      onChange={() => toggleKit('kit_autres')}
-                      className="w-4 h-4 accent-vert-fonce"
-                    />
-                    Autres
-                  </label>
-                </div>
-              </div>
 
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleEnregistrerPaiement}
-                  disabled={saving || !montant || caissesIndisponibles.length > 0}
-                  title={caissesIndisponibles.length > 0 ? 'Ouvrez les caisses avant d\'encaisser un paiement' : undefined}
-                  className="px-6 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold disabled:opacity-50"
-                >
-                  {saving ? 'Enregistrement…' : 'Encaisser le paiement'}
-                </button>
-                <button
-                  onClick={() => setRecuOuvert(true)}
-                  disabled={!dernierPaiement}
-                  className="px-5 py-2.5 rounded-xl border border-vert-fonce text-vert-fonce text-sm font-semibold disabled:opacity-40 disabled:border-[#d7e8de] disabled:text-[#9aa8a1] flex items-center gap-1.5"
-                >
-                  🖨️ Reçu de paiement
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleEnregistrerPaiement}
+                    disabled={saving || !montant || caissesIndisponibles.length > 0}
+                    title={caissesIndisponibles.length > 0 ? 'Ouvrez les caisses avant d\'encaisser un paiement' : undefined}
+                    className="px-6 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold disabled:opacity-50"
+                  >
+                    {saving ? 'Enregistrement…' : 'Encaisser le paiement'}
+                  </button>
+                  <button
+                    onClick={() => setRecuOuvert(true)}
+                    disabled={!dernierPaiement}
+                    className="px-5 py-2.5 rounded-xl border border-vert-fonce text-vert-fonce text-sm font-semibold disabled:opacity-40 disabled:border-[#d7e8de] disabled:text-[#9aa8a1] flex items-center gap-1.5"
+                  >
+                    🖨️ Reçu de paiement
+                  </button>
+                </div>
               </div>
             </div>
 
