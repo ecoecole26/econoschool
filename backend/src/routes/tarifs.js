@@ -1,15 +1,26 @@
 import { Router } from 'express'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
+import { getAnneeCourante } from '../lib/anneeScolaire.js'
 
 const router = Router()
 
-// GET /api/tarifs -> tous les niveaux de MON établissement, triés
+// GET /api/tarifs?annee= -> tous les niveaux de MON établissement pour
+// l'année demandée (par défaut l'année en cours), triés.
 router.get('/', requireAuth, async (req, res) => {
+  let annee
+  try {
+    annee = req.query.annee || (await getAnneeCourante(req.user.code_etablissement))
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+  if (!annee) return res.json({ tarifs: [], annee: null })
+
   const { data, error } = await supabase
     .from('tarifs')
     .select('*')
     .eq('code_etablissement', req.user.code_etablissement)
+    .eq('annee_scolaire', annee)
     .not('niveau', 'is', null)
     .order('ordre', { ascending: true })
 
@@ -18,14 +29,26 @@ router.get('/', requireAuth, async (req, res) => {
     return res.status(500).json({ error: 'Erreur lors de la lecture des tarifs' })
   }
 
-  res.json({ tarifs: data })
+  res.json({ tarifs: data, annee })
 })
 
 // PUT /api/tarifs  { tarifs: [{ id, scolarite_annuelle, frais_inscription, frais_annexes, frais_examen }, ...] }
-// Sauvegarde groupée de tous les niveaux en une fois (comme le bouton "Sauvegarder" unique de la page).
+// Sauvegarde groupée — toujours sur l'ANNÉE EN COURS (une année passée est
+// en lecture seule, aucune requête d'écriture n'y est jamais envoyée par le
+// frontend, mais on filtre aussi ici par sécurité).
 router.put('/', requireAuth, async (req, res) => {
   if (req.user.role !== 'fondateur') {
     return res.status(403).json({ error: 'Seul le Fondateur peut modifier les tarifs' })
+  }
+
+  let annee
+  try {
+    annee = await getAnneeCourante(req.user.code_etablissement)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+  if (!annee) {
+    return res.status(400).json({ error: "Aucune année scolaire active pour cet établissement" })
   }
 
   const { tarifs } = req.body || {}
@@ -49,6 +72,7 @@ router.put('/', requireAuth, async (req, res) => {
       })
       .eq('id', id)
       .eq('code_etablissement', req.user.code_etablissement)
+      .eq('annee_scolaire', annee)
       .select()
       .single()
 

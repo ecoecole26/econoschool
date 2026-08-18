@@ -1,15 +1,26 @@
 import { Router } from 'express'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
+import { getAnneeCourante } from '../lib/anneeScolaire.js'
 
 const router = Router()
 
-// GET /api/dates-butoir -> { global: 'YYYY-MM-DD'|null, parNiveau: { '6eme': 'YYYY-MM-DD', ... } }
+// GET /api/dates-butoir?annee= -> { global, parNiveau } pour l'année demandée
+// (par défaut l'année en cours).
 router.get('/', requireAuth, async (req, res) => {
+  let annee
+  try {
+    annee = req.query.annee || (await getAnneeCourante(req.user.code_etablissement))
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+  if (!annee) return res.json({ global: null, parNiveau: {}, annee: null })
+
   const { data, error } = await supabase
     .from('dates_butoir')
     .select('niveau, date_butoir')
     .eq('code_etablissement', req.user.code_etablissement)
+    .eq('annee_scolaire', annee)
 
   if (error) {
     console.error('[dates-butoir] erreur lecture:', error.message)
@@ -22,7 +33,7 @@ router.get('/', requireAuth, async (req, res) => {
     if (d.niveau) parNiveau[d.niveau] = d.date_butoir
   }
 
-  res.json({ global, parNiveau })
+  res.json({ global, parNiveau, annee })
 })
 
 // PUT /api/dates-butoir/globale  { date_butoir: 'YYYY-MM-DD' | null }
@@ -46,14 +57,27 @@ router.put('/niveau/:niveau', requireAuth, async (req, res) => {
 async function upsertOuSupprime(req, res, niveau, date_butoir) {
   const code_etablissement = req.user.code_etablissement
   try {
+    const annee = await getAnneeCourante(code_etablissement)
+    if (!annee) {
+      return res.status(400).json({ error: "Aucune année scolaire active pour cet établissement" })
+    }
+
     if (!date_butoir) {
-      const q = supabase.from('dates_butoir').delete().eq('code_etablissement', code_etablissement)
+      const q = supabase
+        .from('dates_butoir')
+        .delete()
+        .eq('code_etablissement', code_etablissement)
+        .eq('annee_scolaire', annee)
       const { error } = niveau ? await q.eq('niveau', niveau) : await q.is('niveau', null)
       if (error) throw error
       return res.json({ ok: true, niveau, date_butoir: null })
     }
 
-    const q = supabase.from('dates_butoir').select('id').eq('code_etablissement', code_etablissement)
+    const q = supabase
+      .from('dates_butoir')
+      .select('id')
+      .eq('code_etablissement', code_etablissement)
+      .eq('annee_scolaire', annee)
     const { data: existant, error: errLecture } = niveau
       ? await q.eq('niveau', niveau).maybeSingle()
       : await q.is('niveau', null).maybeSingle()
@@ -68,7 +92,7 @@ async function upsertOuSupprime(req, res, niveau, date_butoir) {
     } else {
       const { error } = await supabase
         .from('dates_butoir')
-        .insert({ niveau, date_butoir, code_etablissement })
+        .insert({ niveau, date_butoir, code_etablissement, annee_scolaire: annee })
       if (error) throw error
     }
 

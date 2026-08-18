@@ -2,11 +2,14 @@ import { Router } from 'express'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { calculerFrais, getReductionActive } from '../lib/frais.js'
+import { getAnneeCourante } from '../lib/anneeScolaire.js'
 
 const router = Router()
 
 // Toute la page Réductions est réservée au Fondateur : c'est lui qui reçoit
-// l'élève et accorde le pourcentage.
+// l'élève et accorde le pourcentage. Toujours sur l'ANNÉE EN COURS — une
+// réduction accordée une année ne se reporte jamais automatiquement sur
+// l'année suivante (à réaccorder chaque année si toujours d'actualité).
 router.use(requireAuth, (req, res, next) => {
   if (req.user.role !== 'fondateur') {
     return res.status(403).json({ error: 'Seul le Fondateur peut accéder aux réductions' })
@@ -15,17 +18,25 @@ router.use(requireAuth, (req, res, next) => {
 })
 
 // GET /api/reductions/recherche?matricule=XXXX
-// Même fiche que la recherche Paiements (élève + frais dus), plus la
-// réduction actuellement active sur cet élève s'il y en a une.
 router.get('/recherche', async (req, res) => {
   const matricule = (req.query.matricule || '').trim()
   if (!matricule) {
     return res.status(400).json({ error: 'Matricule requis' })
   }
 
-  const { data: eleve, error: errEleve } = await supabase
+  let annee
+  try {
+    annee = await getAnneeCourante(req.user.code_etablissement)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+  if (!annee) {
+    return res.status(400).json({ error: "Aucune année scolaire active pour cet établissement" })
+  }
+
+  const { data: identite, error: errEleve } = await supabase
     .from('eleves')
-    .select('*')
+    .select('id, matricule, nom')
     .eq('code_etablissement', req.user.code_etablissement)
     .ilike('matricule', matricule)
     .maybeSingle()
@@ -34,32 +45,53 @@ router.get('/recherche', async (req, res) => {
     console.error('[reductions] erreur recherche élève:', errEleve.message)
     return res.status(500).json({ error: 'Erreur lors de la recherche' })
   }
-  if (!eleve) {
+  if (!identite) {
     return res.status(404).json({ error: `Aucun élève avec le matricule "${matricule}"` })
   }
+
+  const { data: inscription, error: errInscription } = await supabase
+    .from('inscriptions')
+    .select('*')
+    .eq('eleve_id', identite.id)
+    .eq('code_etablissement', req.user.code_etablissement)
+    .eq('annee_scolaire', annee)
+    .maybeSingle()
+
+  if (errInscription) {
+    console.error('[reductions] erreur recherche inscription:', errInscription.message)
+    return res.status(500).json({ error: 'Erreur lors de la recherche' })
+  }
+  if (!inscription) {
+    return res.status(404).json({ error: `${identite.nom} n'est pas inscrit(e) pour l'année ${annee}` })
+  }
+
+  const eleve = { ...identite, ...inscription, id: identite.id }
 
   const { data: tarif } = await supabase
     .from('tarifs')
     .select('*')
     .eq('code_etablissement', req.user.code_etablissement)
+    .eq('annee_scolaire', annee)
     .eq('niveau', eleve.niveau)
     .maybeSingle()
 
   let reduction = null
   try {
-    reduction = await getReductionActive(supabase, eleve.id)
+    reduction = await getReductionActive(supabase, eleve.id, annee)
   } catch (errReduction) {
     console.error('[reductions] erreur lecture réduction:', errReduction.message)
   }
 
   const fraisActuels = calculerFrais(tarif || {}, eleve, reduction?.pourcentage || 0)
 
-  res.json({ eleve, tarif: tarif || null, reduction, frais: fraisActuels })
+  res.json({ eleve, tarif: tarif || null, reduction, frais: fraisActuels, annee })
 })
 
 // POST /api/reductions  { eleve_id, pourcentage, motif }
-// Accorde (ou remplace) la réduction active de l'élève. L'ancienne réduction
-// active, s'il y en a une, passe en statut "remplacee" pour garder l'historique.
+// Accorde (ou remplace) la réduction active de l'élève POUR L'ANNÉE EN
+// COURS. L'ancienne réduction active de CETTE MÊME ANNÉE, s'il y en a une,
+// passe en statut "remplacee" pour garder l'historique (celles des années
+// précédentes ne sont jamais touchées).
 router.post('/', async (req, res) => {
   const { eleve_id, pourcentage, motif } = req.body || {}
 
@@ -71,22 +103,45 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Pourcentage invalide (0 à 100)' })
   }
 
-  const { data: eleve, error: errEleve } = await supabase
+  let annee
+  try {
+    annee = await getAnneeCourante(req.user.code_etablissement)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+  if (!annee) {
+    return res.status(400).json({ error: "Aucune année scolaire active pour cet établissement" })
+  }
+
+  const { data: identite, error: errEleve } = await supabase
     .from('eleves')
-    .select('id, matricule, niveau, affecte')
+    .select('id, matricule')
     .eq('id', eleve_id)
     .eq('code_etablissement', req.user.code_etablissement)
     .maybeSingle()
 
-  if (errEleve || !eleve) {
+  if (errEleve || !identite) {
     return res.status(404).json({ error: 'Élève introuvable' })
   }
 
-  // Remplace l'ancienne réduction active éventuelle par la nouvelle.
+  const { data: inscription, error: errInscription } = await supabase
+    .from('inscriptions')
+    .select('niveau, affecte')
+    .eq('eleve_id', eleve_id)
+    .eq('code_etablissement', req.user.code_etablissement)
+    .eq('annee_scolaire', annee)
+    .maybeSingle()
+
+  if (errInscription || !inscription) {
+    return res.status(404).json({ error: `Cet élève n'est pas inscrit pour l'année ${annee}` })
+  }
+
+  // Remplace l'ancienne réduction active éventuelle DE CETTE ANNÉE par la nouvelle.
   const { error: errRemplacement } = await supabase
     .from('reductions')
     .update({ statut: 'remplacee', updated_at: new Date().toISOString() })
     .eq('eleve_id', eleve_id)
+    .eq('annee_scolaire', annee)
     .eq('statut', 'active')
 
   if (errRemplacement) {
@@ -98,12 +153,13 @@ router.post('/', async (req, res) => {
     .from('reductions')
     .insert({
       eleve_id,
-      matricule: eleve.matricule,
+      matricule: identite.matricule,
       pourcentage: pourcentageNum,
       motif: motif || null,
       accordee_par: req.user.nom || req.user.role,
       statut: 'active',
-      code_etablissement: req.user.code_etablissement
+      code_etablissement: req.user.code_etablissement,
+      annee_scolaire: annee
     })
     .select()
     .single()
@@ -117,16 +173,19 @@ router.post('/', async (req, res) => {
     .from('tarifs')
     .select('*')
     .eq('code_etablissement', req.user.code_etablissement)
-    .eq('niveau', eleve.niveau)
+    .eq('annee_scolaire', annee)
+    .eq('niveau', inscription.niveau)
     .maybeSingle()
 
-  const frais = calculerFrais(tarif || {}, eleve, pourcentageNum)
+  const frais = calculerFrais(tarif || {}, inscription, pourcentageNum)
 
   res.json({ reduction, frais })
 })
 
 // POST /api/reductions/:id/annuler -> annule une réduction active (retour à
-// la scolarité pleine pour cet élève).
+// la scolarité pleine pour cet élève). Fonctionne quelle que soit l'année de
+// la réduction (une réduction d'une année passée reste annulable, même si
+// cette page ne les affiche plus au quotidien).
 router.post('/:id/annuler', async (req, res) => {
   const { data: reduction, error: errLecture } = await supabase
     .from('reductions')

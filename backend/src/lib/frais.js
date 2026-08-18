@@ -30,13 +30,10 @@ export function calculerFrais(tarif, eleve, reductionPourcentage = 0) {
 }
 
 // Renvoie la réduction active de l'élève (une seule à la fois), ou null.
-export async function getReductionActive(supabase, eleve_id) {
-  const { data, error } = await supabase
-    .from('reductions')
-    .select('*')
-    .eq('eleve_id', eleve_id)
-    .eq('statut', 'active')
-    .maybeSingle()
+export async function getReductionActive(supabase, eleve_id, annee_scolaire) {
+  let q = supabase.from('reductions').select('*').eq('eleve_id', eleve_id).eq('statut', 'active')
+  if (annee_scolaire) q = q.eq('annee_scolaire', annee_scolaire)
+  const { data, error } = await q.maybeSingle()
 
   if (error) throw new Error(error.message)
   return data

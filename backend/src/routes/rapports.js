@@ -4,6 +4,7 @@ import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { calculerBilanEleves } from './eleves.js'
 import { TYPES_CAISSE, caissesVisiblesPourRole } from '../lib/caisse.js'
+import { getAnneeCourante } from '../lib/anneeScolaire.js'
 
 const router = Router()
 
@@ -21,7 +22,8 @@ function feuilleAvecLargeurs(aoa, largeurs) {
 // Répartition par niveau), avec les mêmes chiffres que ceux affichés à l'écran.
 router.get('/export', requireAuth, async (req, res) => {
   try {
-    const { lignes, resume } = await calculerBilanEleves({ code_etablissement: req.user.code_etablissement })
+    const annee = req.query.annee || (await getAnneeCourante(req.user.code_etablissement))
+    const { lignes, resume } = await calculerBilanEleves({ code_etablissement: req.user.code_etablissement, annee })
 
     const typesVisibles = caissesVisiblesPourRole(req.user.role)
     const { data: caissesData, error: errCaisses } = await supabase
