@@ -78,8 +78,9 @@ export const api = {
     a.remove()
     window.URL.revokeObjectURL(url)
   },
-  exporterRapport: async () => {
-    const res = await fetch(`${API_URL}/rapports/export`, {
+  exporterRapport: async (annee) => {
+    const qs = annee ? `?annee=${encodeURIComponent(annee)}` : ''
+    const res = await fetch(`${API_URL}/rapports/export${qs}`, {
       headers: { ...authHeaders() }
     })
     if (!res.ok) {
@@ -129,6 +130,9 @@ export const api = {
   getEtablissement: () => request('/etablissement'),
   saveEtablissement: (payload) =>
     request('/etablissement', { method: 'PUT', body: JSON.stringify(payload) }),
+  getAnnees: () => request('/etablissement/annees'),
+  creerNouvelleAnnee: (annee) =>
+    request('/etablissement/annees', { method: 'POST', body: JSON.stringify({ annee }) }),
 
   getComptes: () => request('/utilisateurs'),
   getBootstrapStatus: (code_etablissement) =>
@@ -136,7 +140,7 @@ export const api = {
   saveCompte: (role, payload) =>
     request(`/utilisateurs/${role}`, { method: 'PUT', body: JSON.stringify(payload) }),
 
-  getTarifs: () => request('/tarifs'),
+  getTarifs: (annee) => request(`/tarifs${annee ? `?annee=${encodeURIComponent(annee)}` : ''}`),
   saveTarifs: (tarifs) => request('/tarifs', { method: 'PUT', body: JSON.stringify({ tarifs }) }),
 
   getTypesFrais: () => request('/types-frais'),
@@ -175,7 +179,7 @@ export const api = {
   marquerNotificationLue: (id) => request(`/notifications/${id}/lu`, { method: 'POST' }),
   marquerToutesNotificationsLues: () => request('/notifications/tout-lire', { method: 'POST' }),
 
-  getDatesButoir: () => request('/dates-butoir'),
+  getDatesButoir: (annee) => request(`/dates-butoir${annee ? `?annee=${encodeURIComponent(annee)}` : ''}`),
   saveDateButoirGlobale: (date_butoir) =>
     request('/dates-butoir/globale', { method: 'PUT', body: JSON.stringify({ date_butoir }) }),
   saveDateButoirNiveau: (niveau, date_butoir) =>

@@ -19,10 +19,12 @@ import Rapports from './pages/Rapports.jsx'
 import BilanPeriodique from './pages/BilanPeriodique.jsx'
 import DateButoir from './pages/DateButoir.jsx'
 import KitInscription from './pages/KitInscription.jsx'
+import { AnneeProvider } from './context/AnneeContext.jsx'
 
 function RequireAuth({ children }) {
   const token = localStorage.getItem('econoschool_token')
-  return token ? children : <Navigate to="/" replace />
+  if (!token) return <Navigate to="/" replace />
+  return <AnneeProvider>{children}</AnneeProvider>
 }
 
 function protect(el) {

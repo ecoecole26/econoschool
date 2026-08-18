@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import NotificationBell from './NotificationBell.jsx'
+import SelecteurAnnee from './SelecteurAnnee.jsx'
 
 export default function Topbar({ title, onToggleSidebar }) {
   const navigate = useNavigate()
@@ -29,6 +30,7 @@ export default function Topbar({ title, onToggleSidebar }) {
         <h1 className="text-lg md:text-2xl font-display font-bold text-vert-fonce truncate">{title}</h1>
       </div>
       <div className="flex items-center gap-2 md:gap-4 shrink-0">
+        <SelecteurAnnee />
         <NotificationBell />
         <div className="text-right leading-tight hidden sm:block">
           <div className="text-sm font-semibold text-vert-fonce capitalize">{role || '—'}</div>
