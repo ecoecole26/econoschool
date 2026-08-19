@@ -191,6 +191,39 @@ export const api = {
   getBilanPeriodique: (debut, fin) =>
     request(`/bilan-periodique?debut=${encodeURIComponent(debut)}&fin=${encodeURIComponent(fin)}`),
 
+  exporterBilanPeriodique: async (debut, fin) => {
+    const res = await fetch(
+      `${API_URL}/bilan-periodique/export?debut=${encodeURIComponent(debut)}&fin=${encodeURIComponent(fin)}`,
+      { headers: { ...authHeaders() } }
+    )
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || `Erreur ${res.status}`)
+    }
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `bilan_periodique_${debut}_au_${fin}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  },
+
+  getConsultationInscrits: (params = {}) => {
+    const qs = new URLSearchParams(params).toString()
+    return request(`/consultation-inscrits${qs ? `?${qs}` : ''}`)
+  },
+  getConsultationInscritsStatistiques: (params = {}) => {
+    const qs = new URLSearchParams(params).toString()
+    return request(`/consultation-inscrits/statistiques${qs ? `?${qs}` : ''}`)
+  },
+  getConsultationInscritsTracabilite: (params = {}) => {
+    const qs = new URLSearchParams(params).toString()
+    return request(`/consultation-inscrits/tracabilite${qs ? `?${qs}` : ''}`)
+  },
+
   rechercherEleveReduction: (matricule) =>
     request(`/reductions/recherche?matricule=${encodeURIComponent(matricule)}`),
   accorderReduction: (payload) =>

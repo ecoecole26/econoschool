@@ -35,6 +35,7 @@ const NAV_SECTIONS = [
       { to: '/rapports', label: 'Rapports', icon: '📈' },
       { to: '/retards', label: 'Retards', icon: '⚠️' },
       { to: '/bilan', label: 'Bilan périodique', icon: '📋' },
+      { to: '/consultation-inscrits', label: 'Consultation Inscrits', icon: '📁' },
       { to: '/butoir', label: 'Date butoir', icon: '📅' }
     ]
   }

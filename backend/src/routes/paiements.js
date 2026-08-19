@@ -173,6 +173,16 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(404).json({ error: 'Élève introuvable' })
   }
 
+  // Niveau/classe de l'année en cours : uniquement pour enrichir le libellé
+  // du mouvement de caisse (voir plus bas) — jamais bloquant si absent.
+  const { data: inscriptionCourante } = await supabase
+    .from('inscriptions')
+    .select('niveau, classe')
+    .eq('eleve_id', eleve_id)
+    .eq('code_etablissement', req.user.code_etablissement)
+    .eq('annee_scolaire', annee)
+    .maybeSingle()
+
   // Un paiement crédite TOUJOURS la caisse : si elle est fermée ou en pause,
   // on bloque avant même de créer le paiement, plutôt que d'enregistrer un
   // paiement dont l'argent ne rentre nulle part.
@@ -242,10 +252,24 @@ router.post('/', requireAuth, async (req, res) => {
   // un avertissement pour investigation.
   let caisseAvertissement = null
   try {
+    // Libellé enrichi (matricule + nom + niveau/classe + tranche) pour que
+    // le tableau "Mouvements" du Bilan périodique identifie l'élève d'un
+    // coup d'œil, sans avoir à ouvrir sa fiche.
+    const niveauClasse = [inscriptionCourante?.niveau, inscriptionCourante?.classe].filter(Boolean).join(' ')
+    const libelle = [
+      `Paiement ${eleve.matricule}`,
+      eleve.nom,
+      niveauClasse || null,
+      tranche_libelle || 'frais'
+    ]
+      .filter(Boolean)
+      .join(' — ')
+
     await crediterCaisseParPaiement({
       montant: montantNum,
-      libelle: `Paiement ${eleve.matricule} — ${tranche_libelle || 'frais'}`,
-      code_etablissement: req.user.code_etablissement
+      libelle,
+      code_etablissement: req.user.code_etablissement,
+      annee_scolaire: annee
     })
   } catch (errCaisse) {
     console.error('[paiements] erreur crédit caisse:', errCaisse.message)

@@ -19,6 +19,7 @@ import Rapports from './pages/Rapports.jsx'
 import BilanPeriodique from './pages/BilanPeriodique.jsx'
 import DateButoir from './pages/DateButoir.jsx'
 import KitInscription from './pages/KitInscription.jsx'
+import ConsultationInscrits from './pages/ConsultationInscrits.jsx'
 import { AnneeProvider } from './context/AnneeContext.jsx'
 
 function RequireAuth({ children }) {
@@ -56,6 +57,7 @@ export default function App() {
       <Route path="/retards" element={protect(<Retards />)} />
       <Route path="/eleves/:matricule/profil" element={protect(<ProfilEleve />)} />
       <Route path="/bilan" element={protect(<BilanPeriodique />)} />
+      <Route path="/consultation-inscrits" element={protect(<ConsultationInscrits />)} />
       <Route path="/butoir" element={protect(<DateButoir />)} />
       <Route path="/kit-inscription" element={protect(<KitInscription />)} />
     </Routes>

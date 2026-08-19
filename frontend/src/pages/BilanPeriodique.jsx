@@ -25,16 +25,30 @@ export default function BilanPeriodique() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [genereLe, setGenereLe] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   async function charger(e) {
     if (e) e.preventDefault()
+    if (!debut || !fin) {
+      setError('Merci de renseigner les deux dates (Du / Au).')
+      return
+    }
+    if (debut > fin) {
+      setError('La date de début doit précéder la date de fin.')
+      return
+    }
     setLoading(true)
     setError('')
     try {
       const res = await api.getBilanPeriodique(debut, fin)
       setData(res)
+      // Confirmation visible que le clic a bien déclenché un nouveau calcul
+      // (utile même quand le résultat est identique au précédent).
+      setGenereLe(new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
     } catch (err) {
       setError(err.message || 'Erreur lors du chargement')
+      setGenereLe(null)
     } finally {
       setLoading(false)
     }
@@ -45,6 +59,19 @@ export default function BilanPeriodique() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  async function handleExporter() {
+    if (!debut || !fin) return
+    setExporting(true)
+    setError('')
+    try {
+      await api.exporterBilanPeriodique(debut, fin)
+    } catch (err) {
+      setError(err.message || 'Erreur lors de la génération du fichier Excel')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <Layout title="Bilan périodique">
       <PageHeader
@@ -53,7 +80,7 @@ export default function BilanPeriodique() {
         subtitle="Résumé financier sur une période choisie : encaissements, dépenses et solde des caisses."
       />
 
-      <form onSubmit={charger} className="flex flex-wrap items-end gap-3 mb-6">
+      <form onSubmit={charger} className="no-print flex flex-wrap items-end gap-3 mb-6">
         <Field label="Du">
           <TextInput type="date" value={debut} onChange={(e) => setDebut(e.target.value)} required />
         </Field>
@@ -66,6 +93,26 @@ export default function BilanPeriodique() {
           className="px-5 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold h-fit disabled:opacity-60"
         >
           {loading ? 'Chargement…' : 'Générer le bilan'}
+        </button>
+        {genereLe && !loading && (
+          <span className="text-xs text-teal font-semibold h-fit pb-2.5">✓ Bilan généré à {genereLe}</span>
+        )}
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={handleExporter}
+          disabled={exporting || !data}
+          className="px-4 py-2.5 rounded-xl border border-vert-fonce text-vert-fonce text-sm font-semibold disabled:opacity-40 h-fit whitespace-nowrap"
+        >
+          {exporting ? 'Génération…' : '📊 Télécharger en Excel'}
+        </button>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          disabled={!data}
+          className="px-4 py-2.5 rounded-xl border border-vert-fonce text-vert-fonce text-sm font-semibold disabled:opacity-40 h-fit whitespace-nowrap"
+        >
+          🖨️ Imprimer
         </button>
       </form>
 
