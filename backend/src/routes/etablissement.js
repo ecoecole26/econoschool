@@ -66,8 +66,8 @@ router.put('/', requireAuth, async (req, res) => {
 // GET /api/etablissement/annees -> toutes les années scolaires pour
 // lesquelles il existe déjà des données (inscriptions ou tarifs), plus
 // systématiquement l'année active de l'établissement même si elle est
-// encore vide. Triées de la plus récente à la plus ancienne, pour peupler
-// le sélecteur d'année (façon EcoleWeb).
+// encore vide. Triées de la plus ancienne à la plus récente (ordre
+// chronologique, gauche → droite dans le sélecteur).
 router.get('/annees', requireAuth, async (req, res) => {
   const code_etablissement = req.user.code_etablissement
 
@@ -88,7 +88,7 @@ router.get('/annees', requireAuth, async (req, res) => {
   for (const i of insc || []) if (i.annee_scolaire) annees.add(i.annee_scolaire)
   for (const t of tarifs || []) if (t.annee_scolaire) annees.add(t.annee_scolaire)
 
-  const liste = [...annees].sort((a, b) => b.localeCompare(a))
+  const liste = [...annees].sort((a, b) => a.localeCompare(b))
 
   res.json({ annees: liste, annee_courante: etab?.annee || null })
 })

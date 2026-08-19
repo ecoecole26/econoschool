@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { seedNouvelEtablissement } from '../lib/seedEtablissement.js'
+import { anneeParDefaut } from '../lib/anneeScolaire.js'
 
 const router = Router()
 const ROLES = ['fondateur', 'proviseur', 'econome']
@@ -137,14 +138,15 @@ async function handleSave(req, res, code_etablissement, { bootstrap }) {
       // fournir une valeur explicite. On utilise le code établissement
       // (garanti unique) plutôt que le nom, qui pourrait un jour se
       // répéter entre deux écoles différentes.
+      const anneeInitiale = anneeParDefaut()
       const { error: errEtab } = await supabase
         .from('etablissements')
-        .insert({ id: code_etablissement, code_etablissement, nom: nom_etablissement })
+        .insert({ id: code_etablissement, code_etablissement, nom: nom_etablissement, annee: anneeInitiale })
       if (errEtab) {
         console.error('[utilisateurs] erreur création établissement:', errEtab.message)
         return res.status(500).json({ error: "Erreur lors de la création de l'établissement" })
       }
-      await seedNouvelEtablissement(code_etablissement)
+      await seedNouvelEtablissement(code_etablissement, anneeInitiale)
     }
   }
 
