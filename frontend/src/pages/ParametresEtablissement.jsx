@@ -108,8 +108,12 @@ export default function ParametresEtablissement() {
             <Field label="Académie / DRENAET">
               <TextInput value={form.academie} onChange={set('academie')} placeholder="DRENAET Bouaké 1" />
             </Field>
-            <Field label="Année scolaire" required>
-              <TextInput value={form.annee} onChange={set('annee')} placeholder="2025-2026" />
+            <Field label="Année scolaire">
+              <TextInput value={form.annee || '—'} disabled />
+              <p className="text-xs text-[#9aa8a1] mt-1">
+                Non modifiable ici : utilise le sélecteur 📅 en haut de l'écran pour démarrer une
+                nouvelle année scolaire.
+              </p>
             </Field>
 
             <Field label="Adresse">
