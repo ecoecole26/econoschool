@@ -73,7 +73,8 @@ export default function BilanPeriodique() {
   }
 
   return (
-    <Layout title="Bilan périodique">
+    <>
+      <Layout title="Bilan périodique">
       <PageHeader
         icon="📋"
         title="Bilan périodique"
@@ -207,7 +208,72 @@ export default function BilanPeriodique() {
           </div>
         </>
       ) : null}
-    </Layout>
+      </Layout>
+
+      {/* Bloc dédié à l'impression : rendu HORS de #app-shell (qui est
+          masqué à l'impression par index.css), sinon la page imprimée
+          reste blanche même si le bouton fonctionne. */}
+      <div className="hidden print:block p-6">
+        <div className="flex items-center justify-between pb-3 border-b-2 border-vert-fonce mb-4">
+          <div className="font-display font-bold text-vert-fonce text-base">EconoSchool</div>
+          <div className="text-right">
+            <h3 className="font-display font-bold text-vert-fonce text-lg">Bilan périodique</h3>
+            <span className="text-xs text-[#6b7d74]">
+              Du {debut} au {fin}
+            </span>
+          </div>
+        </div>
+
+        {data && (
+          <>
+            <table className="w-full text-sm mb-5">
+              <tbody>
+                <tr className="border-b border-[#f1f5f2]">
+                  <td className="py-1.5 pr-2 text-[#6b7d74]">Encaissements</td>
+                  <td className="py-1.5 text-right font-semibold">{formatFCFA(data.resume.encaissements)}</td>
+                </tr>
+                <tr className="border-b border-[#f1f5f2]">
+                  <td className="py-1.5 pr-2 text-[#6b7d74]">Dépenses</td>
+                  <td className="py-1.5 text-right font-semibold">{formatFCFA(data.resume.depenses)}</td>
+                </tr>
+                <tr className="border-b border-[#f1f5f2]">
+                  <td className="py-1.5 pr-2 text-[#6b7d74]">Net sur la période</td>
+                  <td className="py-1.5 text-right font-semibold">{formatFCFA(data.resume.net_periode)}</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-2 text-[#6b7d74]">Solde actuel (total)</td>
+                  <td className="py-1.5 text-right font-semibold">{formatFCFA(data.resume.solde_actuel_total)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h4 className="text-sm font-display font-bold text-vert-fonce mb-2">
+              Mouvements de la période ({data.mouvements.length})
+            </h4>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
+                  <th className="py-1 pr-2">Date</th>
+                  <th className="py-1 pr-2">Libellé</th>
+                  <th className="py-1 pr-2">Type</th>
+                  <th className="py-1 pr-2 text-right">Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.mouvements.map((m) => (
+                  <tr key={m.id} className="border-b border-[#f1f5f2]">
+                    <td className="py-1 pr-2 whitespace-nowrap">{new Date(m.date).toLocaleDateString('fr-FR')}</td>
+                    <td className="py-1 pr-2">{m.libelle || '—'}</td>
+                    <td className="py-1 pr-2">{m.type_operation}</td>
+                    <td className="py-1 pr-2 text-right font-semibold whitespace-nowrap">{formatFCFA(m.montant)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </div>
+    </>
   )
 }
 

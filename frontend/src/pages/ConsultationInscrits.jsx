@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Layout from '../components/Layout.jsx'
 import { Field, TextInput, Select } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
@@ -292,57 +293,62 @@ function OngletTableau({ etablissement }) {
         )}
       </div>
 
-      {/* Bloc dédié à l'impression, hors #app-shell (même principe que Rapports/Retards). */}
-      <div className="hidden print:block p-6">
-        <EnTeteImpression etablissement={etablissement} titre="Consultation Inscrits — Tableau" />
-        <div className="flex gap-6 text-sm mb-4">
-          <span>
-            Période : <strong>{formatDateFr(debut)} au {formatDateFr(fin)}</strong>
-          </span>
-          {niveau && (
+      {/* Bloc dédié à l'impression : rendu via portail directement dans
+          <body>, HORS de #app-shell (masqué à l'impression) — sinon la
+          page imprimée reste blanche même si le bouton fonctionne. */}
+      {createPortal(
+        <div className="hidden print:block p-6">
+          <EnTeteImpression etablissement={etablissement} titre="Consultation Inscrits — Tableau" />
+          <div className="flex gap-6 text-sm mb-4">
             <span>
-              Niveau : <strong>{niveau}</strong>
+              Période : <strong>{formatDateFr(debut)} au {formatDateFr(fin)}</strong>
             </span>
-          )}
-          {classe && (
+            {niveau && (
+              <span>
+                Niveau : <strong>{niveau}</strong>
+              </span>
+            )}
+            {classe && (
+              <span>
+                Classe : <strong>{classe}</strong>
+              </span>
+            )}
             <span>
-              Classe : <strong>{classe}</strong>
+              Élèves inscrits : <strong>{data?.total_eleves ?? 0}</strong>
             </span>
-          )}
-          <span>
-            Élèves inscrits : <strong>{data?.total_eleves ?? 0}</strong>
-          </span>
-          <span>
-            Total encaissé : <strong>{formatFCFA(data?.total_montant)}</strong>
-          </span>
-        </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
-              <th className="py-1.5 pr-2">Date</th>
-              <th className="py-1.5 pr-2">Matricule</th>
-              <th className="py-1.5 pr-2">Nom &amp; Prénoms</th>
-              <th className="py-1.5 pr-2">Niveau</th>
-              <th className="py-1.5 pr-2">Classe</th>
-              <th className="py-1.5 pr-2 text-right">Somme encaissée</th>
-              <th className="py-1.5 pr-2">Type de paiement</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(data?.lignes || []).map((l) => (
-              <tr key={l.eleve_id} className="border-b border-[#f1f5f2]">
-                <td className="py-1 pr-2">{formatDateFr(l.date_premier_paiement)}</td>
-                <td className="py-1 pr-2">{l.matricule}</td>
-                <td className="py-1 pr-2">{l.nom}</td>
-                <td className="py-1 pr-2">{l.niveau || '—'}</td>
-                <td className="py-1 pr-2">{l.classe || '—'}</td>
-                <td className="py-1 pr-2 text-right font-semibold">{formatFCFA(l.montant)}</td>
-                <td className="py-1 pr-2">{l.types_paiement}</td>
+            <span>
+              Total encaissé : <strong>{formatFCFA(data?.total_montant)}</strong>
+            </span>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
+                <th className="py-1.5 pr-2">Date</th>
+                <th className="py-1.5 pr-2">Matricule</th>
+                <th className="py-1.5 pr-2">Nom &amp; Prénoms</th>
+                <th className="py-1.5 pr-2">Niveau</th>
+                <th className="py-1.5 pr-2">Classe</th>
+                <th className="py-1.5 pr-2 text-right">Somme encaissée</th>
+                <th className="py-1.5 pr-2">Type de paiement</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {(data?.lignes || []).map((l) => (
+                <tr key={l.eleve_id} className="border-b border-[#f1f5f2]">
+                  <td className="py-1 pr-2">{formatDateFr(l.date_premier_paiement)}</td>
+                  <td className="py-1 pr-2">{l.matricule}</td>
+                  <td className="py-1 pr-2">{l.nom}</td>
+                  <td className="py-1 pr-2">{l.niveau || '—'}</td>
+                  <td className="py-1 pr-2">{l.classe || '—'}</td>
+                  <td className="py-1 pr-2 text-right font-semibold">{formatFCFA(l.montant)}</td>
+                  <td className="py-1 pr-2">{l.types_paiement}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+        document.body
+      )}
     </>
   )
 }
@@ -489,37 +495,40 @@ function OngletStatistiques({ etablissement }) {
         )}
       </div>
 
-      <div className="hidden print:block p-6">
-        <EnTeteImpression etablissement={etablissement} titre="Consultation Inscrits — Statistiques" />
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
-              <th className="py-1.5 pr-2">Niveau</th>
-              <th className="py-1.5 pr-2 text-right">Effectif</th>
-              <th className="py-1.5 pr-2 text-right">Inscrits</th>
-              <th className="py-1.5 pr-2 text-right">Non inscrits</th>
-              <th className="py-1.5 pr-2 text-right">Somme encaissée</th>
-              <th className="py-1.5 pr-2 text-right">Somme restante</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(data?.parNiveau || []).map((g) => (
-              <tr key={g.niveau} className="border-b border-[#f1f5f2]">
-                <td className="py-1 pr-2">{g.niveau}</td>
-                <td className="py-1 pr-2 text-right">{g.effectif}</td>
-                <td className="py-1 pr-2 text-right">
-                  {g.inscrits} ({g.pct_inscrits}%)
-                </td>
-                <td className="py-1 pr-2 text-right">
-                  {g.non_inscrits} ({g.pct_non_inscrits}%)
-                </td>
-                <td className="py-1 pr-2 text-right">{formatFCFA(g.montant_encaisse)}</td>
-                <td className="py-1 pr-2 text-right font-semibold">{formatFCFA(g.montant_restant)}</td>
+      {createPortal(
+        <div className="hidden print:block p-6">
+          <EnTeteImpression etablissement={etablissement} titre="Consultation Inscrits — Statistiques" />
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
+                <th className="py-1.5 pr-2">Niveau</th>
+                <th className="py-1.5 pr-2 text-right">Effectif</th>
+                <th className="py-1.5 pr-2 text-right">Inscrits</th>
+                <th className="py-1.5 pr-2 text-right">Non inscrits</th>
+                <th className="py-1.5 pr-2 text-right">Somme encaissée</th>
+                <th className="py-1.5 pr-2 text-right">Somme restante</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {(data?.parNiveau || []).map((g) => (
+                <tr key={g.niveau} className="border-b border-[#f1f5f2]">
+                  <td className="py-1 pr-2">{g.niveau}</td>
+                  <td className="py-1 pr-2 text-right">{g.effectif}</td>
+                  <td className="py-1 pr-2 text-right">
+                    {g.inscrits} ({g.pct_inscrits}%)
+                  </td>
+                  <td className="py-1 pr-2 text-right">
+                    {g.non_inscrits} ({g.pct_non_inscrits}%)
+                  </td>
+                  <td className="py-1 pr-2 text-right">{formatFCFA(g.montant_encaisse)}</td>
+                  <td className="py-1 pr-2 text-right font-semibold">{formatFCFA(g.montant_restant)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+        document.body
+      )}
     </>
   )
 }
@@ -681,47 +690,50 @@ function OngletTracabilite({ etablissement }) {
         )}
       </div>
 
-      <div className="hidden print:block p-6">
-        <EnTeteImpression etablissement={etablissement} titre="Consultation Inscrits — Traçabilité par agent" />
-        <div className="flex gap-6 text-sm mb-4">
-          <span>
-            Période : <strong>{formatDateFr(debut)} au {formatDateFr(fin)}</strong>
-          </span>
-          <span>
-            Montant total encaissé : <strong>{formatFCFA(data?.total.montant)}</strong>
-          </span>
-        </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
-              <th className="py-1.5 pr-2">Agent</th>
-              {(data?.niveaux || []).map((n) => (
-                <th key={n} className="py-1.5 pr-2 text-right">
-                  {n}
-                </th>
-              ))}
-              <th className="py-1.5 pr-2 text-right">Total</th>
-              <th className="py-1.5 pr-2 text-right">Montant</th>
-              <th className="py-1.5 pr-2 text-right">%</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(data?.agents || []).map((a) => (
-              <tr key={a.agent} className="border-b border-[#f1f5f2]">
-                <td className="py-1 pr-2">{a.agent}</td>
-                {a.parNiveau.map((v, i) => (
-                  <td key={data.niveaux[i]} className="py-1 pr-2 text-right">
-                    {v}
-                  </td>
+      {createPortal(
+        <div className="hidden print:block p-6">
+          <EnTeteImpression etablissement={etablissement} titre="Consultation Inscrits — Traçabilité par agent" />
+          <div className="flex gap-6 text-sm mb-4">
+            <span>
+              Période : <strong>{formatDateFr(debut)} au {formatDateFr(fin)}</strong>
+            </span>
+            <span>
+              Montant total encaissé : <strong>{formatFCFA(data?.total.montant)}</strong>
+            </span>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
+                <th className="py-1.5 pr-2">Agent</th>
+                {(data?.niveaux || []).map((n) => (
+                  <th key={n} className="py-1.5 pr-2 text-right">
+                    {n}
+                  </th>
                 ))}
-                <td className="py-1 pr-2 text-right font-semibold">{a.total_inscrits}</td>
-                <td className="py-1 pr-2 text-right font-semibold">{formatFCFA(a.montant)}</td>
-                <td className="py-1 pr-2 text-right">{a.pct}%</td>
+                <th className="py-1.5 pr-2 text-right">Total</th>
+                <th className="py-1.5 pr-2 text-right">Montant</th>
+                <th className="py-1.5 pr-2 text-right">%</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {(data?.agents || []).map((a) => (
+                <tr key={a.agent} className="border-b border-[#f1f5f2]">
+                  <td className="py-1 pr-2">{a.agent}</td>
+                  {a.parNiveau.map((v, i) => (
+                    <td key={data.niveaux[i]} className="py-1 pr-2 text-right">
+                      {v}
+                    </td>
+                  ))}
+                  <td className="py-1 pr-2 text-right font-semibold">{a.total_inscrits}</td>
+                  <td className="py-1 pr-2 text-right font-semibold">{formatFCFA(a.montant)}</td>
+                  <td className="py-1 pr-2 text-right">{a.pct}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+        document.body
+      )}
     </>
   )
 }
