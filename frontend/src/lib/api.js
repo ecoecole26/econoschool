@@ -131,6 +131,7 @@ export const api = {
   saveEtablissement: (payload) =>
     request('/etablissement', { method: 'PUT', body: JSON.stringify(payload) }),
   getAnnees: () => request('/etablissement/annees'),
+  creerAnneeScolaire: (annee) => request('/etablissement/annees', { method: 'POST', body: JSON.stringify({ annee }) }),
   creerNouvelleAnnee: (annee) =>
     request('/etablissement/annees', { method: 'POST', body: JSON.stringify({ annee }) }),
 

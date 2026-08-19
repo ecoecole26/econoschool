@@ -36,11 +36,11 @@ export function verifierAnneeModifiable(annee, anneeCourante) {
 
 // Calcule une année scolaire par défaut à partir de la date du jour, pour
 // initialiser un TOUT NOUVEL établissement (avant que le Fondateur ne l'ait
-// lui-même précisée) : de septembre à décembre → année N-(N+1), de janvier à
-// août → année (N-1)-N (on considère toujours être dans l'année scolaire qui
-// vient de commencer ou qui est en cours).
+// lui-même précisée) : d'août à décembre → année N-(N+1) (la prochaine
+// rentrée, déjà en préparation), de janvier à juillet → année (N-1)-N
+// (l'année scolaire en cours n'est pas encore terminée).
 export function anneeParDefaut(date = new Date()) {
   const annee = date.getFullYear()
   const mois = date.getMonth() + 1 // 1-12
-  return mois >= 9 ? `${annee}-${annee + 1}` : `${annee - 1}-${annee}`
+  return mois >= 8 ? `${annee}-${annee + 1}` : `${annee - 1}-${annee}`
 }
