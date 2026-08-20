@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import Layout from '../components/Layout.jsx'
 import { Field, TextInput, Select } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
+import { useAnnee } from '../context/AnneeContext.jsx'
 
 // Niveaux standards de l'établissement (mêmes que la page Tarifs par niveau).
 const NIVEAUX = ['6eme', '5eme', '4eme', '3eme', 'Seconde', 'Premiere', 'Terminale']
@@ -135,6 +136,7 @@ export default function ConsultationInscrits() {
 // filtrables par niveau/classe, imprimables.
 // ============================================================
 function OngletTableau({ etablissement }) {
+  const { anneeSelectionnee } = useAnnee()
   const [debut, setDebut] = useState(premierJourDuMois())
   const [fin, setFin] = useState(aujourdhuiISO())
   const [niveau, setNiveau] = useState('')
@@ -151,6 +153,7 @@ function OngletTableau({ etablissement }) {
       const params = { debut, fin }
       if (niveau) params.niveau = niveau
       if (classe.trim()) params.classe = classe.trim()
+      if (anneeSelectionnee) params.annee = anneeSelectionnee
       const res = await api.getConsultationInscrits(params)
       setData(res)
     } catch (err) {
@@ -163,7 +166,7 @@ function OngletTableau({ etablissement }) {
   useEffect(() => {
     charger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [anneeSelectionnee])
 
   function handleExporter() {
     if (!data || data.lignes.length === 0) return
@@ -358,17 +361,19 @@ function OngletTableau({ etablissement }) {
 // période) : inscrits/non-inscrits, sommes, pourcentages.
 // ============================================================
 function OngletStatistiques({ etablissement }) {
+  const { anneeSelectionnee } = useAnnee()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    setLoading(true)
     api
-      .getConsultationInscritsStatistiques()
+      .getConsultationInscritsStatistiques(anneeSelectionnee ? { annee: anneeSelectionnee } : {})
       .then(setData)
       .catch((err) => setError(err.message || 'Erreur lors du chargement'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [anneeSelectionnee])
 
   function handleExporter() {
     if (!data) return
@@ -538,6 +543,7 @@ function OngletStatistiques({ etablissement }) {
 // quels élèves, par niveau, et combien au total, sur une période choisie.
 // ============================================================
 function OngletTracabilite({ etablissement }) {
+  const { anneeSelectionnee } = useAnnee()
   const [debut, setDebut] = useState(premierJourDuMois())
   const [fin, setFin] = useState(aujourdhuiISO())
   const [data, setData] = useState(null)
@@ -549,7 +555,9 @@ function OngletTracabilite({ etablissement }) {
     setLoading(true)
     setError('')
     try {
-      const res = await api.getConsultationInscritsTracabilite({ debut, fin })
+      const params = { debut, fin }
+      if (anneeSelectionnee) params.annee = anneeSelectionnee
+      const res = await api.getConsultationInscritsTracabilite(params)
       setData(res)
     } catch (err) {
       setError(err.message || 'Erreur lors du chargement')
@@ -561,7 +569,7 @@ function OngletTracabilite({ etablissement }) {
   useEffect(() => {
     charger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [anneeSelectionnee])
 
   function handleExporter() {
     if (!data || data.agents.length === 0) return

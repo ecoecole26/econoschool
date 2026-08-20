@@ -160,6 +160,67 @@ router.post('/annees', requireAuth, async (req, res) => {
         return res.status(500).json({ error: 'Erreur lors de la préparation de la nouvelle année' })
       }
     }
+
+    // Recopie de la même façon les types de frais (catégories) et leurs
+    // tranches (libellés + dates d'échéance) comme base de départ pour la
+    // nouvelle année — l'établissement ajuste ensuite (dates notamment,
+    // qui changent chaque rentrée).
+    const { data: anciensTypes, error: errLectureTypes } = await supabase
+      .from('types_frais')
+      .select('id, code, nom, echeances_max, ordre')
+      .eq('code_etablissement', code_etablissement)
+      .eq('annee_scolaire', etab.annee)
+
+    if (errLectureTypes) {
+      console.error('[etablissement] erreur lecture anciens types_frais:', errLectureTypes.message)
+      return res.status(500).json({ error: 'Erreur lors de la préparation de la nouvelle année' })
+    }
+
+    if (anciensTypes?.length) {
+      const { data: nouveauxTypes, error: errCopieTypes } = await supabase
+        .from('types_frais')
+        .insert(
+          anciensTypes.map(({ id, ...t }) => ({ ...t, code_etablissement, annee_scolaire: nouvelleAnnee }))
+        )
+        .select('id, code')
+
+      if (errCopieTypes) {
+        console.error('[etablissement] erreur copie types_frais nouvelle année:', errCopieTypes.message)
+        return res.status(500).json({ error: 'Erreur lors de la préparation de la nouvelle année' })
+      }
+
+      // Recopie les tranches de chaque ancien type vers le type équivalent
+      // de la nouvelle année (les id changent, on relie par `code`).
+      const nouvelIdParCode = new Map((nouveauxTypes || []).map((t) => [t.code, t.id]))
+      const { data: anciennesTranches, error: errLectureTranches } = await supabase
+        .from('tranches_frais')
+        .select('type_frais_id, label, date_echeance, ordre')
+        .in('type_frais_id', anciensTypes.map((t) => t.id))
+
+      if (errLectureTranches) {
+        console.error('[etablissement] erreur lecture anciennes tranches:', errLectureTranches.message)
+        return res.status(500).json({ error: 'Erreur lors de la préparation de la nouvelle année' })
+      }
+
+      const codeParAncienId = new Map(anciensTypes.map((t) => [t.id, t.code]))
+      const nouvellesTranches = (anciennesTranches || [])
+        .map((tr) => {
+          const nouvelId = nouvelIdParCode.get(codeParAncienId.get(tr.type_frais_id))
+          if (!nouvelId) return null
+          // La date d'échéance change chaque rentrée : on ne la recopie PAS,
+          // seuls le libellé et l'ordre sont reconduits.
+          return { type_frais_id: nouvelId, label: tr.label, date_echeance: null, ordre: tr.ordre }
+        })
+        .filter(Boolean)
+
+      if (nouvellesTranches.length) {
+        const { error: errCopieTranches } = await supabase.from('tranches_frais').insert(nouvellesTranches)
+        if (errCopieTranches) {
+          console.error('[etablissement] erreur copie tranches nouvelle année:', errCopieTranches.message)
+          return res.status(500).json({ error: 'Erreur lors de la préparation de la nouvelle année' })
+        }
+      }
+    }
   }
 
   const { data, error } = await supabase

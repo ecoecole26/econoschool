@@ -144,7 +144,7 @@ export const api = {
   getTarifs: (annee) => request(`/tarifs${annee ? `?annee=${encodeURIComponent(annee)}` : ''}`),
   saveTarifs: (tarifs) => request('/tarifs', { method: 'PUT', body: JSON.stringify({ tarifs }) }),
 
-  getTypesFrais: () => request('/types-frais'),
+  getTypesFrais: (annee) => request(`/types-frais${annee ? `?annee=${encodeURIComponent(annee)}` : ''}`),
   addTranche: (typeId) => request(`/types-frais/${typeId}/tranches`, { method: 'POST' }),
   deleteTranche: (id) => request(`/types-frais/tranches/${id}`, { method: 'DELETE' }),
   saveTranches: (tranches) =>

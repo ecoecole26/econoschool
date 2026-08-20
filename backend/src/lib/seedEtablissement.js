@@ -35,8 +35,8 @@ export async function seedNouvelEtablissement(code_etablissement, annee_scolaire
   const { error: errTypes } = await supabase
     .from('types_frais')
     .upsert(
-      TYPES_FRAIS_DEFAUT.map((t) => ({ ...t, code_etablissement })),
-      { onConflict: 'code_etablissement,code', ignoreDuplicates: true }
+      TYPES_FRAIS_DEFAUT.map((t) => ({ ...t, code_etablissement, annee_scolaire })),
+      { onConflict: 'code_etablissement,annee_scolaire,code', ignoreDuplicates: true }
     )
   if (errTypes) console.error('[seedEtablissement] erreur seed types_frais:', errTypes.message)
 }

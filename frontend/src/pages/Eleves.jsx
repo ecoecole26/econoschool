@@ -6,6 +6,7 @@ import StatPill from '../components/StatPill.jsx'
 import IconButton from '../components/IconButton.jsx'
 import Modal from '../components/Modal.jsx'
 import { api } from '../lib/api.js'
+import { useAnnee } from '../context/AnneeContext.jsx'
 
 function Badge({ ok, labelOui, labelNon }) {
   return (
@@ -21,6 +22,7 @@ function Badge({ ok, labelOui, labelNon }) {
 
 export default function Eleves() {
   const navigate = useNavigate()
+  const { anneeSelectionnee, estLectureSeule } = useAnnee()
   const [tab, setTab] = useState('liste')
   const [search, setSearch] = useState('')
   const [classe, setClasse] = useState('')
@@ -53,7 +55,13 @@ export default function Eleves() {
     setLoading(true)
     setError('')
     try {
-      const res = await api.getEleves({ search, classe, page: pageDemandee, pageSize })
+      const res = await api.getEleves({
+        search,
+        classe,
+        page: pageDemandee,
+        pageSize,
+        ...(anneeSelectionnee ? { annee: anneeSelectionnee } : {})
+      })
       setEleves(res.eleves || [])
       setTotal(res.total ?? (res.eleves || []).length)
       setTotalActifs(res.total_actifs ?? 0)
@@ -69,7 +77,7 @@ export default function Eleves() {
   useEffect(() => {
     load(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [anneeSelectionnee])
 
   function handleSearchSubmit(e) {
     e.preventDefault()
@@ -190,6 +198,12 @@ export default function Eleves() {
           <StatPill label="Actifs" value={totalActifs} variant="teal" />
         </div>
 
+        {estLectureSeule && (
+          <div className="mb-4 text-xs font-medium text-orange bg-[#fff7ed] border border-orange/30 rounded-lg px-3 py-2">
+            🔒 Année {anneeSelectionnee} : consultation uniquement, aucune modification possible.
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
             {error}
@@ -280,16 +294,20 @@ export default function Eleves() {
                       <IconButton variant="teal" title="Voir" onClick={() => setSelected(el)}>
                         👁️
                       </IconButton>
-                      <IconButton variant="orange" title="Modifier" onClick={() => openEdit(el)}>
-                        ✏️
-                      </IconButton>
-                      <IconButton
-                        variant="danger"
-                        title="Supprimer"
-                        onClick={() => openDelete(el)}
-                      >
-                        🗑️
-                      </IconButton>
+                      {!estLectureSeule && (
+                        <>
+                          <IconButton variant="orange" title="Modifier" onClick={() => openEdit(el)}>
+                            ✏️
+                          </IconButton>
+                          <IconButton
+                            variant="danger"
+                            title="Supprimer"
+                            onClick={() => openDelete(el)}
+                          >
+                            🗑️
+                          </IconButton>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

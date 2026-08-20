@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import Layout from '../components/Layout.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import { api } from '../lib/api.js'
+import { useAnnee } from '../context/AnneeContext.jsx'
 
 export default function TypesDeFrais() {
+  const { anneeSelectionnee, estLectureSeule } = useAnnee()
   const [types, setTypes] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -12,14 +14,16 @@ export default function TypesDeFrais() {
 
   function load() {
     return api
-      .getTypesFrais()
+      .getTypesFrais(anneeSelectionnee)
       .then(({ types }) => setTypes(types || []))
       .catch((err) => setMessage(err.message))
   }
 
   useEffect(() => {
+    setLoading(true)
     load().finally(() => setLoading(false))
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anneeSelectionnee])
 
   function setTrancheField(typeId, trancheId, field, value) {
     setTypes((list) =>
@@ -82,9 +86,15 @@ export default function TypesDeFrais() {
         icon="🏷️"
         title="Types de frais"
         subtitle="Échéances et structures de paiement."
-        onSave={handleSave}
+        onSave={estLectureSeule ? undefined : handleSave}
         saving={saving}
       />
+
+      {estLectureSeule && (
+        <div className="mb-5 text-xs font-medium text-orange bg-[#fff7ed] border border-orange/30 rounded-lg px-3 py-2">
+          🔒 Année {anneeSelectionnee} : consultation uniquement, aucune modification possible.
+        </div>
+      )}
 
       {message && (
         <div className="mb-5 text-sm px-3 py-2 rounded-lg bg-teal-light text-teal inline-block">
@@ -112,27 +122,31 @@ export default function TypesDeFrais() {
                     <div key={tr.id} className="flex items-center gap-3">
                       <input
                         value={tr.label}
+                        disabled={estLectureSeule}
                         onChange={(e) =>
                           setTrancheField(type.id, tr.id, 'label', e.target.value)
                         }
-                        className="flex-1 px-3.5 py-2.5 border border-[#d7e8de] rounded-lg text-sm focus:outline-none focus:border-teal"
+                        className="flex-1 px-3.5 py-2.5 border border-[#d7e8de] rounded-lg text-sm focus:outline-none focus:border-teal disabled:opacity-60 disabled:bg-[#f5f8f6]"
                       />
                       <input
                         type="date"
                         value={tr.date_echeance || ''}
+                        disabled={estLectureSeule}
                         onChange={(e) =>
                           setTrancheField(type.id, tr.id, 'date_echeance', e.target.value)
                         }
-                        className="px-3.5 py-2.5 border border-[#d7e8de] rounded-lg text-sm focus:outline-none focus:border-teal"
+                        className="px-3.5 py-2.5 border border-[#d7e8de] rounded-lg text-sm focus:outline-none focus:border-teal disabled:opacity-60 disabled:bg-[#f5f8f6]"
                       />
-                      <button
-                        onClick={() => handleDelete(type.id, tr.id)}
-                        disabled={busyType === type.id}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-danger text-danger hover:bg-red-50 disabled:opacity-50"
-                        title="Supprimer cette tranche"
-                      >
-                        🗑️
-                      </button>
+                      {!estLectureSeule && (
+                        <button
+                          onClick={() => handleDelete(type.id, tr.id)}
+                          disabled={busyType === type.id}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg border border-danger text-danger hover:bg-red-50 disabled:opacity-50"
+                          title="Supprimer cette tranche"
+                        >
+                          🗑️
+                        </button>
+                      )}
                     </div>
                   ))}
                   {type.tranches.length === 0 && (
@@ -140,15 +154,19 @@ export default function TypesDeFrais() {
                   )}
                 </div>
 
-                <button
-                  onClick={() => handleAdd(type.id)}
-                  disabled={atMax || busyType === type.id}
-                  className="px-4 py-2 rounded-lg border border-[#d7e8de] text-sm font-semibold text-vert-fonce hover:bg-teal-light disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  + Ajouter
-                </button>
-                {atMax && (
-                  <span className="ml-3 text-xs text-[#9aa8a1]">Maximum atteint</span>
+                {!estLectureSeule && (
+                  <>
+                    <button
+                      onClick={() => handleAdd(type.id)}
+                      disabled={atMax || busyType === type.id}
+                      className="px-4 py-2 rounded-lg border border-[#d7e8de] text-sm font-semibold text-vert-fonce hover:bg-teal-light disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      + Ajouter
+                    </button>
+                    {atMax && (
+                      <span className="ml-3 text-xs text-[#9aa8a1]">Maximum atteint</span>
+                    )}
+                  </>
                 )}
               </div>
             )

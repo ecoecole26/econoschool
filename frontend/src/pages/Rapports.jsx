@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Layout from '../components/Layout.jsx'
 import { api } from '../lib/api.js'
+import { useAnnee } from '../context/AnneeContext.jsx'
 
 function formatFCFA(n) {
   return `${Math.round(n || 0).toLocaleString('fr-FR')} FCFA`
@@ -11,6 +12,7 @@ function formatDateAujourdhui() {
 }
 
 export default function Rapports() {
+  const { anneeSelectionnee, estLectureSeule } = useAnnee()
   const [lignes, setLignes] = useState([])
   const [resume, setResume] = useState(null)
   const [caisses, setCaisses] = useState([])
@@ -30,7 +32,10 @@ export default function Rapports() {
     setLoading(true)
     setError('')
     try {
-      const [bilan, caissesRes] = await Promise.all([api.getBilanEleves({}), api.getCaisses()])
+      const [bilan, caissesRes] = await Promise.all([
+        api.getBilanEleves(anneeSelectionnee ? { annee: anneeSelectionnee } : {}),
+        api.getCaisses()
+      ])
       setLignes(bilan.lignes || [])
       setResume(bilan.resume || null)
       setCaisses(caissesRes.caisses || [])
@@ -43,7 +48,8 @@ export default function Rapports() {
 
   useEffect(() => {
     charger()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anneeSelectionnee])
 
   const affectes = useMemo(() => lignes.filter((l) => l.affecte).length, [lignes])
   const nonAffectes = lignes.length - affectes
@@ -95,7 +101,7 @@ export default function Rapports() {
     setExporting(true)
     setError('')
     try {
-      await api.exporterRapport()
+      await api.exporterRapport(anneeSelectionnee)
     } catch (err) {
       setError(err.message || "Erreur lors de l'export")
     } finally {

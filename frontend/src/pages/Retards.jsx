@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
 import { Field, TextInput, Select } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
+import { useAnnee } from '../context/AnneeContext.jsx'
 
 function formatFCFA(n) {
   return `${Math.round(n || 0).toLocaleString('fr-FR')} FCFA`
@@ -20,6 +21,7 @@ const BADGE_STATUT = {
 
 export default function Retards() {
   const navigate = useNavigate()
+  const { anneeSelectionnee, estLectureSeule } = useAnnee()
 
   const [search, setSearch] = useState('')
   const [classe, setClasse] = useState('')
@@ -43,6 +45,7 @@ export default function Retards() {
     if (search.trim()) params.search = search.trim()
     if (classe.trim()) params.classe = classe.trim()
     if (statutPaiement) params.statut_paiement = statutPaiement
+    if (anneeSelectionnee) params.annee = anneeSelectionnee
     return params
   }
 
@@ -63,7 +66,7 @@ export default function Retards() {
   useEffect(() => {
     charger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [anneeSelectionnee])
 
   function handleFiltrer(e) {
     e.preventDefault()
@@ -160,6 +163,12 @@ export default function Retards() {
           Filtrer
         </button>
       </form>
+
+      {estLectureSeule && (
+        <div className="mb-5 text-xs font-medium text-orange bg-[#fff7ed] border border-orange/30 rounded-lg px-3 py-2">
+          🔒 Année {anneeSelectionnee} : ces chiffres reflètent la situation telle qu'elle était à l'époque.
+        </div>
+      )}
 
       {error && (
         <div className="mb-5 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">

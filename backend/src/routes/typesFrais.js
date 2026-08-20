@@ -1,16 +1,27 @@
 import { Router } from 'express'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
+import { getAnneeCourante } from '../lib/anneeScolaire.js'
 
 const router = Router()
 
-// GET /api/types-frais -> les catégories de MON établissement, avec leurs
-// tranches imbriquées.
+// GET /api/types-frais?annee= -> les catégories de MON établissement pour
+// l'année demandée (année en cours par défaut), avec leurs tranches
+// imbriquées.
 router.get('/', requireAuth, async (req, res) => {
+  let annee
+  try {
+    annee = req.query.annee || (await getAnneeCourante(req.user.code_etablissement))
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+  if (!annee) return res.json({ types: [], annee: null })
+
   const { data: types, error: err1 } = await supabase
     .from('types_frais')
     .select('*')
     .eq('code_etablissement', req.user.code_etablissement)
+    .eq('annee_scolaire', annee)
     .order('ordre', { ascending: true })
 
   if (err1) {
@@ -33,7 +44,7 @@ router.get('/', requireAuth, async (req, res) => {
     tranches: tranches.filter((tr) => tr.type_frais_id === t.id)
   }))
 
-  res.json({ types: result })
+  res.json({ types: result, annee })
 })
 
 // POST /api/types-frais/:typeId/tranches -> ajoute une tranche (si sous le max)
@@ -44,14 +55,22 @@ router.post('/:typeId/tranches', requireAuth, async (req, res) => {
 
   const { typeId } = req.params
 
+  let annee
+  try {
+    annee = await getAnneeCourante(req.user.code_etablissement)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+
   const { data: type } = await supabase
     .from('types_frais')
     .select('echeances_max')
     .eq('id', typeId)
     .eq('code_etablissement', req.user.code_etablissement)
+    .eq('annee_scolaire', annee)
     .maybeSingle()
 
-  if (!type) return res.status(404).json({ error: 'Type de frais introuvable' })
+  if (!type) return res.status(404).json({ error: 'Type de frais introuvable pour l\'année en cours' })
 
   const { count } = await supabase
     .from('tranches_frais')
@@ -87,17 +106,26 @@ router.delete('/tranches/:id', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'Seul le Fondateur peut modifier les types de frais' })
   }
 
-  // Vérifie que la tranche appartient bien à un type de frais de mon
-  // établissement avant de la supprimer (défense en profondeur : l'id est
-  // un UUID difficile à deviner, mais on ne prend pas de risque).
+  let annee
+  try {
+    annee = await getAnneeCourante(req.user.code_etablissement)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+
+  // Vérifie que la tranche appartient bien à un type de frais de MON
+  // établissement, pour l'année EN COURS (défense en profondeur + garde-fou
+  // années passées : une tranche d'une année passée ne peut pas être
+  // supprimée, quel que soit l'id fourni).
   const { data: tranche } = await supabase
     .from('tranches_frais')
-    .select('id, type_frais_id, types_frais!inner(code_etablissement)')
+    .select('id, type_frais_id, types_frais!inner(code_etablissement, annee_scolaire)')
     .eq('id', req.params.id)
     .eq('types_frais.code_etablissement', req.user.code_etablissement)
+    .eq('types_frais.annee_scolaire', annee)
     .maybeSingle()
 
-  if (!tranche) return res.status(404).json({ error: 'Tranche introuvable' })
+  if (!tranche) return res.status(404).json({ error: "Tranche introuvable pour l'année en cours" })
 
   const { error } = await supabase.from('tranches_frais').delete().eq('id', req.params.id)
 
@@ -121,12 +149,20 @@ router.put('/tranches', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Liste de tranches invalide' })
   }
 
-  // Restreint la sauvegarde aux tranches qui appartiennent bien à mon
-  // établissement (défense en profondeur).
+  let annee
+  try {
+    annee = await getAnneeCourante(req.user.code_etablissement)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+
+  // Restreint la sauvegarde aux tranches qui appartiennent bien à MON
+  // établissement, pour l'année EN COURS (une année passée reste figée).
   const { data: mesTypes } = await supabase
     .from('types_frais')
     .select('id')
     .eq('code_etablissement', req.user.code_etablissement)
+    .eq('annee_scolaire', annee)
   const mesTypesIds = new Set((mesTypes || []).map((t) => t.id))
 
   const { data: mesTranches } = mesTypesIds.size
