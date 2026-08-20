@@ -125,8 +125,8 @@ export default function TarifsParNiveau() {
 
           {tarifs.length === 0 && (
             <div className="col-span-full text-sm text-[#6b7d74] bg-white rounded-2xl border border-[#e3ebe6] p-8 text-center">
-              Aucun niveau trouvé — exécute la migration SQL <code>002_tarifs.sql</code> dans
-              Supabase pour créer les 7 niveaux par défaut.
+              Aucun niveau disponible pour le moment. Recharge la page — les 7 niveaux standards se
+              créent automatiquement dès qu'une année scolaire est active.
             </div>
           )}
         </div>

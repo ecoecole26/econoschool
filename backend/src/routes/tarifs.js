@@ -2,11 +2,18 @@ import { Router } from 'express'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { getAnneeCourante } from '../lib/anneeScolaire.js'
+import { seedNouvelEtablissement } from '../lib/seedEtablissement.js'
 
 const router = Router()
 
 // GET /api/tarifs?annee= -> tous les niveaux de MON établissement pour
 // l'année demandée (par défaut l'année en cours), triés.
+//
+// Auto-réparation : si aucune ligne n'existe encore pour cette année (ex:
+// juste après un "démarrer une nouvelle année", ou après une correction de
+// données), on recrée les 7 niveaux standards à 0 FCFA plutôt que de
+// renvoyer une liste vide bloquante — le Fondateur n'a jamais à dépendre
+// d'une intervention technique pour configurer ses tarifs.
 router.get('/', requireAuth, async (req, res) => {
   let annee
   try {
@@ -16,7 +23,7 @@ router.get('/', requireAuth, async (req, res) => {
   }
   if (!annee) return res.json({ tarifs: [], annee: null })
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('tarifs')
     .select('*')
     .eq('code_etablissement', req.user.code_etablissement)
@@ -27,6 +34,22 @@ router.get('/', requireAuth, async (req, res) => {
   if (error) {
     console.error('[tarifs] erreur lecture:', error.message)
     return res.status(500).json({ error: 'Erreur lors de la lecture des tarifs' })
+  }
+
+  if (!data || data.length === 0) {
+    await seedNouvelEtablissement(req.user.code_etablissement, annee)
+    ;({ data, error } = await supabase
+      .from('tarifs')
+      .select('*')
+      .eq('code_etablissement', req.user.code_etablissement)
+      .eq('annee_scolaire', annee)
+      .not('niveau', 'is', null)
+      .order('ordre', { ascending: true }))
+
+    if (error) {
+      console.error('[tarifs] erreur relecture après auto-réparation:', error.message)
+      return res.status(500).json({ error: 'Erreur lors de la lecture des tarifs' })
+    }
   }
 
   res.json({ tarifs: data, annee })

@@ -901,7 +901,7 @@ router.post('/import', requireAuth, uploadExcel.single('file'), async (req, res)
           if (payloadDettes.length) {
             const { error: errDettes } = await supabase
               .from('credits_reports')
-              .upsert(payloadDettes, { onConflict: 'etablissement,matricule' })
+              .upsert(payloadDettes, { onConflict: 'matricule,annee,etablissement' })
             if (errDettes) {
               console.error('[eleves/import] erreur enregistrement dettes:', errDettes.message)
             } else {
