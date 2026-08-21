@@ -221,6 +221,37 @@ router.post('/annees', requireAuth, async (req, res) => {
         }
       }
     }
+
+    // Archive le solde de caisse de l'année qui se termine ("ancien solde"),
+    // consultable seulement par le Fondateur — SANS toucher au solde réel
+    // de `caisses`, qui reste cumulatif et continue de courir normalement.
+    const { data: caissesActuelles, error: errLectureCaisses } = await supabase
+      .from('caisses')
+      .select('type_caisse, solde')
+      .eq('code_etablissement', code_etablissement)
+
+    if (errLectureCaisses) {
+      console.error('[etablissement] erreur lecture caisses avant archivage:', errLectureCaisses.message)
+      return res.status(500).json({ error: 'Erreur lors de la préparation de la nouvelle année' })
+    }
+
+    if (caissesActuelles?.length) {
+      const { error: errArchiveCaisses } = await supabase
+        .from('caisses_soldes_anterieurs')
+        .upsert(
+          caissesActuelles.map((c) => ({
+            code_etablissement,
+            annee_scolaire: etab.annee,
+            type_caisse: c.type_caisse,
+            montant: c.solde || 0
+          })),
+          { onConflict: 'code_etablissement,annee_scolaire,type_caisse' }
+        )
+      if (errArchiveCaisses) {
+        console.error('[etablissement] erreur archivage ancien solde caisse:', errArchiveCaisses.message)
+        return res.status(500).json({ error: 'Erreur lors de la préparation de la nouvelle année' })
+      }
+    }
   }
 
   const { data, error } = await supabase

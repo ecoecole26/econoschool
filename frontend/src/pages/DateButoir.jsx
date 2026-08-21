@@ -3,6 +3,7 @@ import Layout from '../components/Layout.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import { Card, Field, TextInput } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
+import { useAnnee } from '../context/AnneeContext.jsx'
 
 function formatDateAffichage(iso) {
   if (!iso) return null
@@ -15,6 +16,7 @@ function formatDateCourte(iso) {
 }
 
 export default function DateButoir() {
+  const { anneeSelectionnee, estLectureSeule } = useAnnee()
   const [niveaux, setNiveaux] = useState([])
   const [global, setGlobal] = useState('')
   const [parNiveau, setParNiveau] = useState({})
@@ -29,7 +31,10 @@ export default function DateButoir() {
     setLoading(true)
     setError('')
     try {
-      const [{ tarifs }, dates] = await Promise.all([api.getTarifs(), api.getDatesButoir()])
+      const [{ tarifs }, dates] = await Promise.all([
+        api.getTarifs(anneeSelectionnee),
+        api.getDatesButoir(anneeSelectionnee)
+      ])
       const listeNiveaux = (tarifs || []).map((t) => t.niveau).filter(Boolean)
       setNiveaux(listeNiveaux)
       setGlobal(dates.global || '')
@@ -44,7 +49,8 @@ export default function DateButoir() {
 
   useEffect(() => {
     charger()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anneeSelectionnee])
 
   async function handleSaveGlobal() {
     setSavingGlobal(true)
@@ -83,6 +89,12 @@ export default function DateButoir() {
         subtitle="Définit la date limite de paiement utilisée pour compter les élèves « en retard » (tableau de bord, retards, rapports)."
       />
 
+      {estLectureSeule && (
+        <div className="mb-5 text-xs font-medium text-orange bg-[#fff7ed] border border-orange/30 rounded-lg px-3 py-2">
+          🔒 Année {anneeSelectionnee} : consultation uniquement, aucune modification possible.
+        </div>
+      )}
+
       {message && (
         <div className="mb-5 text-sm px-3 py-2 rounded-lg bg-teal-light text-teal inline-block">{message}</div>
       )}
@@ -107,29 +119,38 @@ export default function DateButoir() {
               <div className="flex items-end gap-2">
                 <div className="flex-1">
                   <Field label="Date limite de paiement">
-                    <TextInput type="date" value={global} onChange={(e) => setGlobal(e.target.value)} />
+                    <TextInput
+                      type="date"
+                      value={global}
+                      disabled={estLectureSeule}
+                      onChange={(e) => setGlobal(e.target.value)}
+                    />
                   </Field>
                 </div>
-                <button
-                  onClick={handleSaveGlobal}
-                  disabled={savingGlobal}
-                  className="px-4 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold disabled:opacity-60 mb-3 whitespace-nowrap"
-                >
-                  {savingGlobal ? '…' : 'Enregistrer'}
-                </button>
+                {!estLectureSeule && (
+                  <button
+                    onClick={handleSaveGlobal}
+                    disabled={savingGlobal}
+                    className="px-4 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold disabled:opacity-60 mb-3 whitespace-nowrap"
+                  >
+                    {savingGlobal ? '…' : 'Enregistrer'}
+                  </button>
+                )}
               </div>
               {global && (
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-[#6b7d74]">
                     En retard après le <strong>{formatDateAffichage(global)}</strong>.
                   </p>
-                  <button
-                    onClick={() => setGlobal('')}
-                    disabled={savingGlobal}
-                    className="text-xs text-[#6b7d74] underline"
-                  >
-                    Effacer
-                  </button>
+                  {!estLectureSeule && (
+                    <button
+                      onClick={() => setGlobal('')}
+                      disabled={savingGlobal}
+                      className="text-xs text-[#6b7d74] underline"
+                    >
+                      Effacer
+                    </button>
+                  )}
                 </div>
               )}
             </Card>
@@ -142,21 +163,24 @@ export default function DateButoir() {
                       <TextInput
                         type="date"
                         value={parNiveau[niveauSelectionne] || ''}
+                        disabled={estLectureSeule}
                         onChange={(e) =>
                           setParNiveau((m) => ({ ...m, [niveauSelectionne]: e.target.value }))
                         }
                       />
                     </Field>
                   </div>
-                  <button
-                    onClick={() => handleSaveNiveau(niveauSelectionne, parNiveau[niveauSelectionne])}
-                    disabled={savingNiveau}
-                    className="px-3.5 py-2.5 rounded-xl bg-vert-fonce text-white text-xs font-semibold disabled:opacity-60 mb-3 whitespace-nowrap"
-                  >
-                    {savingNiveau ? '…' : 'Enregistrer'}
-                  </button>
+                  {!estLectureSeule && (
+                    <button
+                      onClick={() => handleSaveNiveau(niveauSelectionne, parNiveau[niveauSelectionne])}
+                      disabled={savingNiveau}
+                      className="px-3.5 py-2.5 rounded-xl bg-vert-fonce text-white text-xs font-semibold disabled:opacity-60 mb-3 whitespace-nowrap"
+                    >
+                      {savingNiveau ? '…' : 'Enregistrer'}
+                    </button>
+                  )}
                 </div>
-                {parNiveau[niveauSelectionne] && (
+                {parNiveau[niveauSelectionne] && !estLectureSeule && (
                   <button
                     onClick={() => handleSaveNiveau(niveauSelectionne, '')}
                     disabled={savingNiveau}

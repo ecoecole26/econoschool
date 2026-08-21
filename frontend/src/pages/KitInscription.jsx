@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import Layout from '../components/Layout.jsx'
 import { api } from '../lib/api.js'
+import { useAnnee } from '../context/AnneeContext.jsx'
 
 // Page dédiée au suivi des kits remis à l'inscription (paquet de rames, kit
 // EPS, autres). Les cases sont cochées depuis la page Paiements ; ici on ne
 // fait que CONSULTER l'état (lecture seule), filtrer par classe/recherche,
 // et imprimer la liste classe par classe pour la remettre au Fondateur.
 export default function KitInscription() {
+  const { anneeSelectionnee, estLectureSeule } = useAnnee()
   const [eleves, setEleves] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -25,7 +27,11 @@ export default function KitInscription() {
     setLoading(true)
     setError('')
     api
-      .getKitsEleves({ search: search.trim(), classe: classe.trim() })
+      .getKitsEleves({
+        search: search.trim(),
+        classe: classe.trim(),
+        ...(anneeSelectionnee ? { annee: anneeSelectionnee } : {})
+      })
       .then(({ eleves }) => setEleves(eleves || []))
       .catch((err) => setError(err.message || 'Erreur lors du chargement'))
       .finally(() => setLoading(false))
@@ -34,7 +40,7 @@ export default function KitInscription() {
   useEffect(() => {
     charger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [anneeSelectionnee])
 
   function handleFiltrer(e) {
     e.preventDefault()
@@ -51,6 +57,7 @@ export default function KitInscription() {
           <p className="text-sm text-[#6b7d74] mt-1">
             Suivi des kits remis à l'inscription (paquet de rames, kit EPS, autres), cochés depuis la
             page Paiements.
+            {estLectureSeule && ` — 🔒 Année ${anneeSelectionnee}, consultation seule.`}
           </p>
         </div>
 

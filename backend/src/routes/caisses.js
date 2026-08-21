@@ -150,4 +150,26 @@ router.post('/:type_caisse/statut', requireAuth, async (req, res) => {
   }
 })
 
+// GET /api/caisses/soldes-anterieurs -> historique des soldes de clôture
+// archivés à chaque changement d'année ("ancien solde"). Fondateur SEUL
+// (l'Économe ne doit pas voir ce qu'il y avait avant sa prise de poste).
+router.get('/soldes-anterieurs', requireAuth, async (req, res) => {
+  if (req.user.role !== 'fondateur') {
+    return res.status(403).json({ error: "Seul le Fondateur peut consulter l'ancien solde" })
+  }
+
+  const { data, error } = await supabase
+    .from('caisses_soldes_anterieurs')
+    .select('*')
+    .eq('code_etablissement', req.user.code_etablissement)
+    .order('annee_scolaire', { ascending: false })
+
+  if (error) {
+    console.error('[caisses] erreur lecture soldes antérieurs:', error.message)
+    return res.status(500).json({ error: "Erreur lors de la lecture de l'ancien solde" })
+  }
+
+  res.json({ soldes: data || [] })
+})
+
 export default router

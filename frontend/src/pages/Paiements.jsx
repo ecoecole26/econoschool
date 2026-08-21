@@ -4,6 +4,7 @@ import Modal from '../components/Modal.jsx'
 import IconButton from '../components/IconButton.jsx'
 import { Card, Field, TextInput, Select } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
+import { useAnnee } from '../context/AnneeContext.jsx'
 
 function formatFCFA(n) {
   return `${Math.round(n || 0).toLocaleString('fr-FR')} FCFA`
@@ -19,6 +20,7 @@ function formatDate(d) {
 }
 
 export default function Paiements() {
+  const { anneeSelectionnee, estLectureSeule } = useAnnee()
   const [matricule, setMatricule] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -153,6 +155,25 @@ export default function Paiements() {
 
   function imprimerRecu() {
     window.print()
+  }
+
+  if (estLectureSeule) {
+    return (
+      <Layout title="Paiements">
+        <div className="bg-white rounded-2xl border border-[#e3ebe6] p-14 text-center max-w-lg mx-auto">
+          <div className="text-4xl mb-3">🔒</div>
+          <div className="text-base font-semibold text-vert-fonce mb-2">
+            Année {anneeSelectionnee} — non disponible ici
+          </div>
+          <p className="text-sm text-[#6b7d74]">
+            Un encaissement se fait toujours en temps réel, sur l'année en cours — l'éventuelle
+            dette d'une année passée s'encaisse automatiquement en priorité depuis cette même
+            page. Reviens sur l'année active (sélecteur en haut) pour rechercher un élève et
+            encaisser un paiement.
+          </p>
+        </div>
+      </Layout>
+    )
   }
 
   return (

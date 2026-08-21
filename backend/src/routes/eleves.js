@@ -135,6 +135,97 @@ router.get('/', requireAuth, async (req, res) => {
   })
 })
 
+// POST /api/eleves  { matricule, nom, classe, niveau?, affecte?, redoublant?, parent?, tel_parent? }
+// Ajoute UN élève manuellement, sur l'année EN COURS uniquement (inscription
+// tardive, oubli dans le fichier DSPS, etc.) — en complément de l'import
+// Excel en masse. Si le matricule existe déjà côté identité (élève déjà
+// connu d'une année précédente), on rattache la nouvelle inscription à
+// cette identité au lieu d'en recréer une — même logique que l'import.
+router.post('/', requireAuth, async (req, res) => {
+  const { matricule, nom, classe, niveau, affecte, redoublant, parent, tel_parent } = req.body || {}
+
+  const matriculePropre = String(matricule || '').trim()
+  const nomPropre = String(nom || '').trim()
+  const classePropre = String(classe || '').trim()
+
+  if (!matriculePropre || !nomPropre || !classePropre) {
+    return res.status(400).json({ error: 'Matricule, nom et classe sont requis' })
+  }
+
+  let annee
+  try {
+    annee = await getAnneeCourante(req.user.code_etablissement)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+  if (!annee) {
+    return res.status(400).json({ error: "Aucune année scolaire active pour cet établissement" })
+  }
+
+  const niveauPropre = String(niveau || '').trim() || classePropre.replace(/\d+$/, '').trim()
+
+  // Garde-fou : un élève ne peut avoir qu'UNE inscription par année (même
+  // contrainte que l'import). On vérifie explicitement pour renvoyer un
+  // message clair plutôt qu'une erreur de contrainte SQL brute.
+  const { data: identiteExistante } = await supabase
+    .from('eleves')
+    .select('id')
+    .eq('code_etablissement', req.user.code_etablissement)
+    .eq('matricule', matriculePropre)
+    .maybeSingle()
+
+  if (identiteExistante) {
+    const { data: inscriptionExistante } = await supabase
+      .from('inscriptions')
+      .select('id')
+      .eq('eleve_id', identiteExistante.id)
+      .eq('annee_scolaire', annee)
+      .maybeSingle()
+    if (inscriptionExistante) {
+      return res.status(400).json({ error: `Le matricule ${matriculePropre} est déjà inscrit pour l'année ${annee}` })
+    }
+  }
+
+  const payloadIdentite = { matricule: matriculePropre, nom: nomPropre, code_etablissement: req.user.code_etablissement }
+  if (parent) payloadIdentite.parent = String(parent).trim()
+  if (tel_parent) payloadIdentite.tel_parent = String(tel_parent).trim()
+
+  const { data: eleve, error: errIdentite } = await supabase
+    .from('eleves')
+    .upsert(payloadIdentite, { onConflict: 'code_etablissement,matricule' })
+    .select('id')
+    .single()
+
+  if (errIdentite) {
+    console.error('[eleves] erreur création identité:', errIdentite.message)
+    return res.status(500).json({ error: "Erreur lors de l'ajout de l'élève" })
+  }
+
+  const { data: inscription, error: errInscription } = await supabase
+    .from('inscriptions')
+    .insert({
+      eleve_id: eleve.id,
+      code_etablissement: req.user.code_etablissement,
+      annee_scolaire: annee,
+      matricule: matriculePropre,
+      nom: nomPropre,
+      classe: classePropre,
+      niveau: niveauPropre,
+      affecte: estAffecte(affecte ?? true),
+      redoublant: estRedoublant(redoublant ?? false),
+      statut: 'Actif'
+    })
+    .select()
+    .single()
+
+  if (errInscription) {
+    console.error('[eleves] erreur création inscription:', errInscription.message)
+    return res.status(500).json({ error: "Erreur lors de l'ajout de l'élève" })
+  }
+
+  res.json({ eleve: { id: eleve.id, ...inscription } })
+})
+
 // Calcule, pour un ensemble d'inscriptions passées (années différentes de
 // l'année en cours), le reste-à-payer de CHACUNE à l'époque — sert à
 // détecter automatiquement une dette antérieure à l'import de la rentrée

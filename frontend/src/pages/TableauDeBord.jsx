@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
 import { Card } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
+import { useAnnee } from '../context/AnneeContext.jsx'
 
 function formatFCFA(n) {
   return `${Math.round(n || 0).toLocaleString('fr-FR')} FCFA`
@@ -58,6 +59,7 @@ function pourcentageSur(valeur, total) {
 
 export default function TableauDeBord() {
   const navigate = useNavigate()
+  const { anneeSelectionnee, estLectureSeule } = useAnnee()
   const [lignes, setLignes] = useState([])
   const [resume, setResume] = useState(null)
   const [caisses, setCaisses] = useState([])
@@ -74,7 +76,7 @@ export default function TableauDeBord() {
     setError('')
     try {
       const [bilan, caissesRes, notifRes, bilanPeriodeRes] = await Promise.all([
-        api.getBilanEleves({}),
+        api.getBilanEleves(anneeSelectionnee ? { annee: anneeSelectionnee } : {}),
         api.getCaisses(),
         api.getNotifications().catch(() => ({ notifications: [] })),
         api.getBilanPeriodique(periodeDebut, periodeFin).catch(() => null)
@@ -93,7 +95,8 @@ export default function TableauDeBord() {
 
   useEffect(() => {
     charger()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anneeSelectionnee])
 
   const caissePrincipale = caisses.find((c) => c.type_caisse === 'principale') || null
   const soldeCaisse = caissePrincipale?.solde || 0
@@ -145,6 +148,12 @@ export default function TableauDeBord() {
           <p className="text-sm text-[#6b7d74] mt-1">Vue d'ensemble de l'établissement, en temps réel.</p>
         </div>
       </div>
+
+      {estLectureSeule && (
+        <div className="mb-5 text-xs font-medium text-orange bg-[#fff7ed] border border-orange/30 rounded-lg px-3 py-2">
+          🔒 Année {anneeSelectionnee} : effectifs et finances de cette année-là (le solde de caisse affiché reste, lui, cumulatif à ce jour).
+        </div>
+      )}
 
       {error && (
         <div className="mb-5 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">

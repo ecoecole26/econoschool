@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Layout from '../components/Layout.jsx'
 import { Card, Field, TextInput } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
+import { useAnnee } from '../context/AnneeContext.jsx'
 
 function formatFCFA(n) {
   return `${Math.round(n || 0).toLocaleString('fr-FR')} FCFA`
@@ -11,6 +12,7 @@ const POURCENTAGES_RAPIDES = [10, 25, 50, 75, 100]
 
 export default function Reductions() {
   const role = localStorage.getItem('econoschool_role')
+  const { anneeSelectionnee, estLectureSeule } = useAnnee()
 
   const [matricule, setMatricule] = useState('')
   const [loading, setLoading] = useState(false)
@@ -31,6 +33,24 @@ export default function Reductions() {
           <p className="text-sm text-[#6b7d74]">
             Les réductions sont accordées uniquement par le Fondateur. Adresse-toi à lui pour
             qu'il traite le dossier de l'élève.
+          </p>
+        </div>
+      </Layout>
+    )
+  }
+
+  if (estLectureSeule) {
+    return (
+      <Layout title="Réductions">
+        <div className="bg-white rounded-2xl border border-[#e3ebe6] p-14 text-center max-w-lg mx-auto">
+          <div className="text-4xl mb-3">🔒</div>
+          <div className="text-base font-semibold text-vert-fonce mb-2">
+            Année {anneeSelectionnee} — non disponible ici
+          </div>
+          <p className="text-sm text-[#6b7d74]">
+            Une réduction ne se reporte jamais automatiquement d'une année à l'autre : cette page
+            fonctionne uniquement sur l'année en cours. Reviens sur l'année active (sélecteur en
+            haut) pour consulter ou accorder une réduction.
           </p>
         </div>
       </Layout>

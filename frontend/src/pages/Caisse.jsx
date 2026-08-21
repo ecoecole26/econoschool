@@ -39,6 +39,7 @@ export default function Caisse() {
 
   const [caisses, setCaisses] = useState([])
   const [journal, setJournal] = useState([])
+  const [soldesAnterieurs, setSoldesAnterieurs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -59,6 +60,13 @@ export default function Caisse() {
     load()
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
+    if (role === 'fondateur') {
+      api
+        .getSoldesAnterieurs()
+        .then(({ soldes }) => setSoldesAnterieurs(soldes || []))
+        .catch(() => {}) // discret : ne bloque pas l'affichage principal de la caisse
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function ouvrirOperation(type_caisse, type_operation) {
@@ -180,6 +188,35 @@ export default function Caisse() {
               </tbody>
             </table>
           </div>
+
+          {role === 'fondateur' && soldesAnterieurs.length > 0 && (
+            <div className="bg-white rounded-2xl border border-[#e3ebe6] p-5">
+              <h4 className="text-base font-display font-bold text-vert-fonce flex items-center gap-2 mb-1">
+                🔒 Ancien solde
+              </h4>
+              <p className="text-xs text-[#9aa8a1] mb-4">
+                Solde de caisse figé à chaque changement d'année — visible seulement par toi, distinct des entrées de l'année en cours.
+              </p>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wide text-[#6b7d74] border-b border-[#e3ebe6]">
+                    <th className="py-2 pr-2">Année</th>
+                    <th className="py-2 pr-2">Caisse</th>
+                    <th className="py-2 pr-2 text-right">Solde de clôture</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {soldesAnterieurs.map((s) => (
+                    <tr key={s.id} className="border-b border-[#f1f5f2]">
+                      <td className="py-2 pr-2">{s.annee_scolaire}</td>
+                      <td className="py-2 pr-2">{LABEL_CAISSE[s.type_caisse] || s.type_caisse}</td>
+                      <td className="py-2 pr-2 text-right font-medium">{formatFCFA(s.montant)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

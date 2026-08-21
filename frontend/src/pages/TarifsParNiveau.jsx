@@ -3,20 +3,23 @@ import Layout from '../components/Layout.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import { Card, Field, TextInput } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
+import { useAnnee } from '../context/AnneeContext.jsx'
 
 export default function TarifsParNiveau() {
+  const { anneeSelectionnee, estLectureSeule } = useAnnee()
   const [tarifs, setTarifs] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
+    setLoading(true)
     api
-      .getTarifs()
+      .getTarifs(anneeSelectionnee)
       .then(({ tarifs }) => setTarifs(tarifs || []))
       .catch((err) => setMessage(err.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [anneeSelectionnee])
 
   function setField(id, field) {
     return (e) => {
@@ -45,9 +48,15 @@ export default function TarifsParNiveau() {
         icon="💰"
         title="Tarifs par niveau"
         subtitle="Définir les frais par niveau (en FCFA). Le total est calculé automatiquement."
-        onSave={handleSave}
+        onSave={estLectureSeule ? undefined : handleSave}
         saving={saving}
       />
+
+      {estLectureSeule && (
+        <div className="mb-5 text-xs font-medium text-orange bg-[#fff7ed] border border-orange/30 rounded-lg px-3 py-2">
+          🔒 Année {anneeSelectionnee} : consultation uniquement, aucune modification possible.
+        </div>
+      )}
 
       {message && (
         <div className="mb-5 text-sm px-3 py-2 rounded-lg bg-teal-light text-teal inline-block">
@@ -84,6 +93,7 @@ export default function TarifsParNiveau() {
                   <TextInput
                     type="number"
                     value={t.scolarite_annuelle ?? 0}
+                    disabled={estLectureSeule}
                     onChange={setField(t.id, 'scolarite_annuelle')}
                   />
                 </Field>
@@ -91,6 +101,7 @@ export default function TarifsParNiveau() {
                   <TextInput
                     type="number"
                     value={t.frais_inscription ?? 0}
+                    disabled={estLectureSeule}
                     onChange={setField(t.id, 'frais_inscription')}
                   />
                 </Field>
@@ -98,6 +109,7 @@ export default function TarifsParNiveau() {
                   <TextInput
                     type="number"
                     value={t.frais_annexes ?? 0}
+                    disabled={estLectureSeule}
                     onChange={setField(t.id, 'frais_annexes')}
                   />
                 </Field>
@@ -106,6 +118,7 @@ export default function TarifsParNiveau() {
                     <TextInput
                       type="number"
                       value={t.frais_examen ?? 0}
+                      disabled={estLectureSeule}
                       onChange={setField(t.id, 'frais_examen')}
                     />
                   </Field>

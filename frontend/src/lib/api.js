@@ -163,6 +163,7 @@ export const api = {
     request('/banque-compte/mouvements', { method: 'POST', body: JSON.stringify(payload) }),
 
   getCaisses: () => request('/caisses'),
+  getSoldesAnterieurs: () => request('/caisses/soldes-anterieurs'),
   ajouterMouvementCaisse: (payload) =>
     request('/caisses/mouvements', { method: 'POST', body: JSON.stringify(payload) }),
   changerStatutCaisse: (type_caisse, statut) =>
