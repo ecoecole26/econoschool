@@ -1,9 +1,24 @@
 import { Router } from 'express'
+import multer from 'multer'
+import * as XLSX from 'xlsx'
 import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { getAnneeCourante } from '../lib/anneeScolaire.js'
 
 const router = Router()
+
+const uploadExcel = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } })
+
+// Enlève les accents/majuscules/espaces superflus d'un en-tête de colonne
+// Excel, pour matcher "Matricule", "matricule ", "MATRICULE" etc. de la
+// même façon que l'import élèves (backend/src/routes/eleves.js).
+function normaliseCle(str) {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+}
 
 // GET /api/credits-reports
 //
@@ -91,6 +106,90 @@ router.post('/import', requireAuth, async (req, res) => {
 
   if (error) {
     console.error('[credits-reports] erreur import:', error.message)
+    return res.status(500).json({ error: "Erreur lors de l'import des élèves à crédit" })
+  }
+
+  res.json({ importes: data?.length || 0, erreurs })
+})
+
+// POST /api/credits-reports/import-excel  (multipart, champ "file")
+//
+// Même logique que POST /import ci-dessus, mais la source des lignes est
+// un fichier Excel (colonnes Matricule, Nom, Niveau, Montant, dans cet
+// ordre ou pas — la casse et les accents n'ont pas d'importance) plutôt
+// qu'un copié-collé JSON. Réutilisée pour proposer une méthode d'import
+// plus simple ("Choisir un fichier" + "Importer") aux économes peu à
+// l'aise avec le copier-coller depuis Excel.
+router.post('/import-excel', requireAuth, uploadExcel.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Aucun fichier reçu (champ "file" attendu)' })
+  }
+
+  let rows
+  try {
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' })
+    const feuille = workbook.Sheets[workbook.SheetNames[0]]
+    const rawRows = XLSX.utils.sheet_to_json(feuille, { defval: '' })
+    rows = rawRows.map((row) => {
+      const clean = {}
+      for (const [k, v] of Object.entries(row)) {
+        clean[normaliseCle(k)] = typeof v === 'string' ? v.trim() : v
+      }
+      return clean
+    })
+  } catch (err) {
+    return res.status(400).json({ error: `Fichier Excel illisible : ${err.message}` })
+  }
+
+  if (rows.length === 0) {
+    return res.status(400).json({ error: 'Le fichier ne contient aucune ligne' })
+  }
+
+  let anneeParDefaut
+  try {
+    anneeParDefaut = await getAnneeCourante(req.user.code_etablissement)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+
+  const erreurs = []
+  const payload = []
+
+  rows.forEach((row, i) => {
+    const ligne = i + 2 // +2 : ligne 1 = en-têtes, tableur commence à 1
+    const matricule = String(row.matricule ?? '').trim()
+    const nom = String(row.nom ?? '').trim()
+    const niveau = String(row.niveau ?? '').trim()
+    const montant = Number(row.montant)
+
+    if (!matricule || !nom || !montant || montant <= 0) {
+      erreurs.push(`Ligne ${ligne} ignorée : matricule, nom et montant (> 0) sont obligatoires`)
+      return
+    }
+
+    const annee = String(row.annee ?? '').trim()
+
+    payload.push({
+      matricule,
+      nom,
+      niveau: niveau || null,
+      solde_reporte: montant,
+      annee: annee || anneeParDefaut || null,
+      etablissement: req.user.code_etablissement
+    })
+  })
+
+  if (payload.length === 0) {
+    return res.status(400).json({ error: 'Aucune ligne valide à importer', erreurs })
+  }
+
+  const { data, error } = await supabase
+    .from('credits_reports')
+    .upsert(payload, { onConflict: 'etablissement,matricule' })
+    .select()
+
+  if (error) {
+    console.error('[credits-reports] erreur import Excel:', error.message)
     return res.status(500).json({ error: "Erreur lors de l'import des élèves à crédit" })
   }
 

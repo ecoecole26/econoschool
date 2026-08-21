@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Layout from '../components/Layout.jsx'
 import { Card } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
@@ -7,47 +7,17 @@ function formatFCFA(n) {
   return `${Math.round(n || 0).toLocaleString('fr-FR')} FCFA`
 }
 
-// Découpe un texte collé depuis Excel (tabulations entre colonnes, retour à
-// la ligne entre lignes) en tableau de lignes {matricule, nom, niveau, montant}.
-// Colonnes attendues, DANS CET ORDRE : Matricule, Nom, Niveau, Montant.
-// Une ligne d'en-tête est détectée et ignorée automatiquement si la 1ère
-// cellule ne ressemble pas à un matricule (contient "matricule" en toutes lettres).
-function parserCollageExcel(texte) {
-  const lignesBrutes = texte
-    .split('\n')
-    .map((l) => l.replace(/\r$/, ''))
-    .filter((l) => l.trim() !== '')
-
-  const lignes = []
-  const erreurs = []
-
-  lignesBrutes.forEach((ligne, i) => {
-    const cellules = ligne.split('\t').map((c) => c.trim())
-    if (i === 0 && cellules[0]?.toLowerCase().includes('matricule')) return // en-tête
-
-    const [matricule, nom, niveau, montantBrut] = cellules
-    const montant = Number(String(montantBrut || '').replace(/[^\d.-]/g, ''))
-
-    if (!matricule || !nom || !montant || montant <= 0) {
-      erreurs.push(`Ligne "${ligne}" ignorée (colonnes attendues : Matricule, Nom, Niveau, Montant)`)
-      return
-    }
-    lignes.push({ matricule, nom, niveau: niveau || '', montant })
-  })
-
-  return { lignes, erreurs }
-}
-
 export default function ElevesACredit() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const [collageOuvert, setCollageOuvert] = useState(false)
-  const [texteColle, setTexteColle] = useState('')
-  const [apercu, setApercu] = useState(null) // { lignes, erreurs }
+  const [importOuvert, setImportOuvert] = useState(false)
+  const fileInput = useRef(null)
+  const [fichier, setFichier] = useState(null)
   const [importEnCours, setImportEnCours] = useState(false)
-  const [messageImport, setMessageImport] = useState('')
+  const [resultImport, setResultImport] = useState(null) // { importes, erreurs }
+  const [erreurImport, setErreurImport] = useState('')
 
   async function charger() {
     setLoading(true)
@@ -66,29 +36,25 @@ export default function ElevesACredit() {
     charger()
   }, [])
 
-  function handleTexteColle(valeur) {
-    setTexteColle(valeur)
-    setMessageImport('')
-    if (valeur.trim()) {
-      setApercu(parserCollageExcel(valeur))
-    } else {
-      setApercu(null)
-    }
+  function handleFileChange(e) {
+    setFichier(e.target.files?.[0] || null)
+    setResultImport(null)
+    setErreurImport('')
   }
 
   async function confirmerImport() {
-    if (!apercu || apercu.lignes.length === 0) return
+    if (!fichier) return
     setImportEnCours(true)
-    setMessageImport('')
+    setErreurImport('')
+    setResultImport(null)
     try {
-      const res = await api.importerCreditsReports(apercu.lignes)
-      setMessageImport(`✓ ${res.importes} élève(s) importé(s) avec succès.`)
-      setTexteColle('')
-      setApercu(null)
-      setCollageOuvert(false)
+      const res = await api.importerCreditsReportsExcel(fichier)
+      setResultImport(res)
+      setFichier(null)
+      if (fileInput.current) fileInput.current.value = ''
       await charger()
     } catch (err) {
-      setMessageImport(`Erreur : ${err.message || "échec de l'import"}`)
+      setErreurImport(err.message || "Erreur lors de l'import")
     } finally {
       setImportEnCours(false)
     }
@@ -126,86 +92,64 @@ export default function ElevesACredit() {
           </p>
         </div>
         <button
-          onClick={() => setCollageOuvert((o) => !o)}
+          onClick={() => setImportOuvert((o) => !o)}
           className="px-4 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold whitespace-nowrap"
         >
-          {collageOuvert ? 'Fermer' : '📋 Coller la liste (Excel)'}
+          {importOuvert ? 'Fermer' : '⬆️ Importer (Excel)'}
         </button>
       </div>
 
-      {collageOuvert && (
-        <Card title="Importer par copier-coller" icon="📋" className="mb-5">
+      {importOuvert && (
+        <Card title="Importer les élèves à crédit (Excel)" icon="⬆️" className="mb-5">
           <p className="text-xs text-[#6b7d74] -mt-2 mb-3">
-            Copiez les colonnes <strong>Matricule</strong>, <strong>Nom</strong>, <strong>Niveau</strong>,{' '}
-            <strong>Montant</strong> depuis Excel (dans cet ordre, une ligne d'en-tête est acceptée), puis
-            collez-les ci-dessous. Un import remplace le solde connu pour chaque matricule déjà présent.
+            Fichier Excel avec les colonnes <strong>Matricule</strong>, <strong>Nom</strong>,{' '}
+            <strong>Niveau</strong>, <strong>Montant</strong> (l'ordre des colonnes n'a pas d'importance).
+            Un import remplace le solde connu pour chaque matricule déjà présent.
           </p>
-          <textarea
-            value={texteColle}
-            onChange={(e) => handleTexteColle(e.target.value)}
-            placeholder={'Matricule\tNom\tNiveau\tMontant\n21421986V\tABDON GRACE\t5eme\t15000'}
-            rows={6}
-            className="w-full border border-[#e3ebe6] rounded-xl px-3 py-2 text-sm font-mono"
-          />
 
-          {apercu && (
-            <div className="mt-3">
-              {apercu.erreurs.length > 0 && (
-                <div className="text-xs text-orange bg-[#fff7ed] border border-[#fde3c4] rounded-lg px-3 py-2 mb-2">
-                  {apercu.erreurs.map((e, i) => (
+          <div className="border-2 border-dashed border-[#d7e8de] rounded-xl p-6 text-center mb-4">
+            <input
+              ref={fileInput}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileChange}
+              className="text-sm"
+            />
+            {fichier && (
+              <p className="text-sm text-[#3d4f45] mt-3">
+                Fichier sélectionné : <b>{fichier.name}</b> ({Math.round(fichier.size / 1024)} Ko)
+              </p>
+            )}
+          </div>
+
+          <button
+            onClick={confirmerImport}
+            disabled={!fichier || importEnCours}
+            className="w-full px-5 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold disabled:opacity-50"
+          >
+            {importEnCours ? 'Import en cours…' : 'Importer'}
+          </button>
+
+          {erreurImport && (
+            <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {erreurImport}
+            </div>
+          )}
+
+          {resultImport && (
+            <div className="mt-4 space-y-2">
+              <p className="text-sm font-semibold text-teal">
+                ✓ {resultImport.importes} élève{resultImport.importes > 1 ? 's' : ''} importé
+                {resultImport.importes > 1 ? 's' : ''} avec succès.
+              </p>
+              {resultImport.erreurs?.length > 0 && (
+                <div className="text-xs text-orange bg-[#fff7ed] border border-[#fde3c4] rounded-lg px-3 py-2 max-h-40 overflow-y-auto">
+                  {resultImport.erreurs.map((e, i) => (
                     <div key={i}>⚠️ {e}</div>
                   ))}
                 </div>
               )}
-              {apercu.lignes.length > 0 ? (
-                <>
-                  <p className="text-xs text-[#6b7d74] mb-2">
-                    Aperçu — {apercu.lignes.length} élève(s) prêt(s) à importer :
-                  </p>
-                  <div className="max-h-56 overflow-y-auto border border-[#e3ebe6] rounded-lg">
-                    <table className="w-full text-xs">
-                      <thead className="bg-[#f6f8f7] sticky top-0">
-                        <tr className="text-left">
-                          <th className="py-1.5 px-2">Matricule</th>
-                          <th className="py-1.5 px-2">Nom</th>
-                          <th className="py-1.5 px-2">Niveau</th>
-                          <th className="py-1.5 px-2 text-right">Montant</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {apercu.lignes.map((l, i) => (
-                          <tr key={i} className="border-t border-[#f1f5f2]">
-                            <td className="py-1 px-2">{l.matricule}</td>
-                            <td className="py-1 px-2">{l.nom}</td>
-                            <td className="py-1 px-2">{l.niveau || '—'}</td>
-                            <td className="py-1 px-2 text-right">{formatFCFA(l.montant)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <button
-                    onClick={confirmerImport}
-                    disabled={importEnCours}
-                    className="mt-3 px-5 py-2.5 rounded-xl bg-vert-fonce text-white text-sm font-semibold disabled:opacity-60"
-                  >
-                    {importEnCours ? 'Import…' : `Importer ${apercu.lignes.length} élève(s)`}
-                  </button>
-                </>
-              ) : (
-                <p className="text-sm text-[#9aa8a1]">Aucune ligne valide détectée pour l'instant.</p>
-              )}
             </div>
-          )}
-
-          {messageImport && (
-            <p
-              className={`mt-3 text-sm font-semibold ${
-                messageImport.startsWith('✓') ? 'text-teal' : 'text-red-600'
-              }`}
-            >
-              {messageImport}
-            </p>
           )}
         </Card>
       )}

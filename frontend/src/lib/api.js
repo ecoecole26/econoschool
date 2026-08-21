@@ -236,5 +236,10 @@ export const api = {
   getCreditsReports: () => request('/credits-reports'),
   importerCreditsReports: (lignes) =>
     request('/credits-reports/import', { method: 'POST', body: JSON.stringify({ lignes }) }),
+  importerCreditsReportsExcel: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return requestMultipart('/credits-reports/import-excel', formData)
+  },
   supprimerCreditReport: (id) => request(`/credits-reports/${id}`, { method: 'DELETE' })
 }
