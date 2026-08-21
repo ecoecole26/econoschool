@@ -241,5 +241,11 @@ export const api = {
     formData.append('file', file)
     return requestMultipart('/credits-reports/import-excel', formData)
   },
-  supprimerCreditReport: (id) => request(`/credits-reports/${id}`, { method: 'DELETE' })
+  supprimerCreditReport: (id) => request(`/credits-reports/${id}`, { method: 'DELETE' }),
+
+  getAutorisations: (statut) => request(`/autorisations${statut ? `?statut=${encodeURIComponent(statut)}` : ''}`),
+  demanderAutorisation: (payload) =>
+    request('/autorisations', { method: 'POST', body: JSON.stringify(payload) }),
+  repondreAutorisation: (id, payload) =>
+    request(`/autorisations/${id}`, { method: 'PATCH', body: JSON.stringify(payload) })
 }

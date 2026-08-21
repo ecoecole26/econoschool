@@ -27,7 +27,8 @@ const NAV_SECTIONS = [
       { to: '/reductions', label: 'Réductions', icon: '🎁' },
       { to: '/caisse', label: 'Caisse', icon: '🗃️' },
       { to: '/entrees', label: 'Entrées', icon: '📥' },
-      { to: '/depenses', label: 'Dépenses', icon: '📤' }
+      { to: '/depenses', label: 'Dépenses', icon: '📤' },
+      { to: '/autorisations', label: 'Autorisations', icon: '🔑' }
     ]
   },
   {

@@ -18,6 +18,7 @@ import notificationsRoutes from './routes/notifications.js'
 import mouvementsRoutes from './routes/mouvements.js'
 import consultationInscritsRoutes from './routes/consultationInscrits.js'
 import creditsReportsRoutes from './routes/creditsReports.js'
+import autorisationsRoutes from './routes/autorisations.js'
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -46,6 +47,7 @@ app.use('/api/notifications', notificationsRoutes)
 app.use('/api/mouvements', mouvementsRoutes)
 app.use('/api/consultation-inscrits', consultationInscritsRoutes)
 app.use('/api/credits-reports', creditsReportsRoutes)
+app.use('/api/autorisations', autorisationsRoutes)
 
 // Les prochaines routes (rapports, dépenses...) viendront ici,
 // une par une, au fur et à mesure de la reconstruction des pages.
