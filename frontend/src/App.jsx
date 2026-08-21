@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login.jsx'
 import Eleves from './pages/Eleves.jsx'
+import AjouterEleve from './pages/AjouterEleve.jsx'
 import ParametresEtablissement from './pages/ParametresEtablissement.jsx'
 import CreationCompte from './pages/CreationCompte.jsx'
 import TarifsParNiveau from './pages/TarifsParNiveau.jsx'
@@ -48,6 +49,7 @@ export default function App() {
       {/* Reste du menu */}
       <Route path="/tableau-de-bord" element={protect(<TableauDeBord />)} />
       <Route path="/eleves" element={protect(<Eleves />)} />
+      <Route path="/ajouter-eleve" element={protect(<AjouterEleve />)} />
       <Route path="/paiements" element={protect(<Paiements />)} />
       <Route path="/caisse" element={protect(<Caisse />)} />
       <Route path="/entrees" element={protect(<Entrees />)} />

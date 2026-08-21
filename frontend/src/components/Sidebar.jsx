@@ -21,6 +21,7 @@ const NAV_SECTIONS = [
     title: 'Gestion',
     items: [
       { to: '/eleves', label: 'Élèves', icon: '🧑‍🎓' },
+      { to: '/ajouter-eleve', label: 'Ajouter élève', icon: '➕' },
       { to: '/paiements', label: 'Paiements', icon: '💳' },
       { to: '/kit-inscription', label: 'Kit inscription', icon: '🎒' },
       { to: '/reductions', label: 'Réductions', icon: '🎁' },

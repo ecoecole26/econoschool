@@ -97,6 +97,7 @@ export const api = {
     a.remove()
     window.URL.revokeObjectURL(url)
   },
+  createEleve: (payload) => request('/eleves', { method: 'POST', body: JSON.stringify(payload) }),
   updateEleve: (id, payload) =>
     request(`/eleves/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteEleve: (id) => request(`/eleves/${id}`, { method: 'DELETE' }),
