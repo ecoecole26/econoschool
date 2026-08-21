@@ -231,5 +231,10 @@ export const api = {
     request(`/reductions/recherche?matricule=${encodeURIComponent(matricule)}`),
   accorderReduction: (payload) =>
     request('/reductions', { method: 'POST', body: JSON.stringify(payload) }),
-  annulerReduction: (id) => request(`/reductions/${id}/annuler`, { method: 'POST' })
+  annulerReduction: (id) => request(`/reductions/${id}/annuler`, { method: 'POST' }),
+
+  getCreditsReports: () => request('/credits-reports'),
+  importerCreditsReports: (lignes) =>
+    request('/credits-reports/import', { method: 'POST', body: JSON.stringify({ lignes }) }),
+  supprimerCreditReport: (id) => request(`/credits-reports/${id}`, { method: 'DELETE' })
 }
