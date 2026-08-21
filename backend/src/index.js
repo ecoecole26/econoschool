@@ -29,22 +29,6 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'econoschool-backend' })
 })
 
-// SONDE TEMPORAIRE — à retirer une fois le souci SMS résolu. Ne révèle
-// jamais la valeur du secret ORANGE_SMS_AUTH, seulement s'il est présent
-// et sa longueur (pour repérer un espace en trop / une valeur tronquée).
-// ORANGE_SMS_EXPEDITEUR n'est pas un secret (juste un numéro de téléphone) :
-// on l'affiche en clair pour confirmer qu'il est bien reçu tel quel.
-app.get('/api/_debug-sms-config', (req, res) => {
-  const auth = process.env.ORANGE_SMS_AUTH
-  res.json({
-    ORANGE_SMS_AUTH_present: Boolean(auth),
-    ORANGE_SMS_AUTH_length: auth ? auth.length : 0,
-    ORANGE_SMS_AUTH_debut: auth ? auth.slice(0, 12) : null,
-    ORANGE_SMS_EXPEDITEUR: process.env.ORANGE_SMS_EXPEDITEUR || null,
-    TRACCAR_SMS_TOKEN_present: Boolean(process.env.TRACCAR_SMS_TOKEN)
-  })
-})
-
 app.use('/api/auth', authRoutes)
 app.use('/api/eleves', elevesRoutes)
 app.use('/api/etablissement', etablissementRoutes)
