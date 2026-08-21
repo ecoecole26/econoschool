@@ -97,6 +97,7 @@ export const api = {
     a.remove()
     window.URL.revokeObjectURL(url)
   },
+  createEleve: (payload) => request('/eleves', { method: 'POST', body: JSON.stringify(payload) }),
   updateEleve: (id, payload) =>
     request(`/eleves/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteEleve: (id) => request(`/eleves/${id}`, { method: 'DELETE' }),
@@ -217,11 +218,6 @@ export const api = {
     const qs = new URLSearchParams(params).toString()
     return request(`/consultation-inscrits${qs ? `?${qs}` : ''}`)
   },
-
-  getCreditsReports: () => request('/credits-reports'),
-  importerCreditsReports: (lignes) =>
-    request('/credits-reports/import', { method: 'POST', body: JSON.stringify({ lignes }) }),
-  supprimerCreditReport: (id) => request(`/credits-reports/${id}`, { method: 'DELETE' }),
   getConsultationInscritsStatistiques: (params = {}) => {
     const qs = new URLSearchParams(params).toString()
     return request(`/consultation-inscrits/statistiques${qs ? `?${qs}` : ''}`)

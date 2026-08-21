@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login.jsx'
 import Eleves from './pages/Eleves.jsx'
+import AjouterEleve from './pages/AjouterEleve.jsx'
 import ParametresEtablissement from './pages/ParametresEtablissement.jsx'
 import CreationCompte from './pages/CreationCompte.jsx'
 import TarifsParNiveau from './pages/TarifsParNiveau.jsx'
@@ -20,7 +21,6 @@ import BilanPeriodique from './pages/BilanPeriodique.jsx'
 import DateButoir from './pages/DateButoir.jsx'
 import KitInscription from './pages/KitInscription.jsx'
 import ConsultationInscrits from './pages/ConsultationInscrits.jsx'
-import ElevesACredit from './pages/ElevesACredit.jsx'
 import { AnneeProvider } from './context/AnneeContext.jsx'
 
 function RequireAuth({ children }) {
@@ -49,6 +49,7 @@ export default function App() {
       {/* Reste du menu */}
       <Route path="/tableau-de-bord" element={protect(<TableauDeBord />)} />
       <Route path="/eleves" element={protect(<Eleves />)} />
+      <Route path="/ajouter-eleve" element={protect(<AjouterEleve />)} />
       <Route path="/paiements" element={protect(<Paiements />)} />
       <Route path="/caisse" element={protect(<Caisse />)} />
       <Route path="/entrees" element={protect(<Entrees />)} />
@@ -59,7 +60,6 @@ export default function App() {
       <Route path="/eleves/:matricule/profil" element={protect(<ProfilEleve />)} />
       <Route path="/bilan" element={protect(<BilanPeriodique />)} />
       <Route path="/consultation-inscrits" element={protect(<ConsultationInscrits />)} />
-      <Route path="/eleves-a-credit" element={protect(<ElevesACredit />)} />
       <Route path="/butoir" element={protect(<DateButoir />)} />
       <Route path="/kit-inscription" element={protect(<KitInscription />)} />
     </Routes>
