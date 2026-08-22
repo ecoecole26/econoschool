@@ -23,16 +23,17 @@ export default function Reductions() {
   const [motif, setMotif] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [messageEstErreur, setMessageEstErreur] = useState(false)
 
-  if (role !== 'fondateur') {
+  if (!['fondateur', 'econome'].includes(role)) {
     return (
       <Layout title="Réductions">
         <div className="bg-white rounded-2xl border border-[#e3ebe6] p-14 text-center max-w-lg mx-auto">
           <div className="text-4xl mb-3">🔒</div>
           <div className="text-base font-semibold text-vert-fonce mb-2">Accès réservé</div>
           <p className="text-sm text-[#6b7d74]">
-            Les réductions sont accordées uniquement par le Fondateur. Adresse-toi à lui pour
-            qu'il traite le dossier de l'élève.
+            Les réductions sont accordées uniquement par le Fondateur (ou l'Économe muni d'une
+            autorisation). Adresse-toi à eux pour qu'ils traitent le dossier de l'élève.
           </p>
         </div>
       </Layout>
@@ -85,6 +86,7 @@ export default function Reductions() {
     if (!donnees || pourcentage === '') return
     setSaving(true)
     setMessage('')
+    setMessageEstErreur(false)
     try {
       await api.accorderReduction({
         eleve_id: donnees.eleve.id,
@@ -95,6 +97,7 @@ export default function Reductions() {
       setMessage('Réduction appliquée ✅')
     } catch (err) {
       setMessage(err.message || "Erreur lors de l'enregistrement")
+      setMessageEstErreur(true)
     } finally {
       setSaving(false)
     }
@@ -104,6 +107,7 @@ export default function Reductions() {
     if (!donnees?.reduction) return
     setSaving(true)
     setMessage('')
+    setMessageEstErreur(false)
     try {
       await api.annulerReduction(donnees.reduction.id)
       await recharger()
@@ -112,6 +116,7 @@ export default function Reductions() {
       setMessage('Réduction annulée — scolarité pleine rétablie ✅')
     } catch (err) {
       setMessage(err.message || "Erreur lors de l'annulation")
+      setMessageEstErreur(true)
     } finally {
       setSaving(false)
     }
@@ -235,13 +240,15 @@ export default function Reductions() {
                     Accordée par {donnees.reduction.accordee_par}
                   </div>
                 </div>
-                <button
-                  onClick={handleAnnuler}
-                  disabled={saving}
-                  className="px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 text-xs font-semibold disabled:opacity-60 shrink-0"
-                >
-                  Annuler
-                </button>
+                {role === 'fondateur' && (
+                  <button
+                    onClick={handleAnnuler}
+                    disabled={saving}
+                    className="px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 text-xs font-semibold disabled:opacity-60 shrink-0"
+                  >
+                    Annuler
+                  </button>
+                )}
               </div>
             )}
 
@@ -324,7 +331,11 @@ export default function Reductions() {
                   >
                     {saving ? 'Enregistrement…' : 'Appliquer la réduction'}
                   </button>
-                  {message && <div className="text-sm text-teal">{message}</div>}
+                  {message && (
+                    <div className={`text-sm ${messageEstErreur ? 'text-red-600' : 'text-teal'}`}>
+                      {message}
+                    </div>
+                  )}
                 </div>
 
                 <p className="text-xs text-[#9aa8a1] mt-3">

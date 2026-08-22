@@ -114,7 +114,9 @@ export default function Caisse() {
           🗃️ Caisse
         </h2>
         <p className="text-sm text-[#6b7d74] mt-1">
-          Économe, Fondateur et Directeur des Études gèrent la caisse ensemble — seul le Fondateur autorise les sorties.
+          Économe, Fondateur et Directeur des Études gèrent la caisse ensemble — les sorties
+          restent réservées au Fondateur, sauf autorisation qu'il a accordée à l'Économe (page
+          Autorisations).
         </p>
       </div>
 
@@ -279,7 +281,7 @@ const STATUT_CAISSE = {
 }
 
 function CarteCaisse({ caisse, role, onOperation, onChangerStatut, changement }) {
-  const peutSortie = role === 'fondateur'
+  const peutSortie = role === 'fondateur' || role === 'econome'
   const statutInfo = STATUT_CAISSE[caisse.statut] || STATUT_CAISSE.non_ouverte
   const estOuverte = caisse.statut === 'ouverte'
   const estFermee = caisse.statut === 'fermee'

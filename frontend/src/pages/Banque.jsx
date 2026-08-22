@@ -44,6 +44,7 @@ function CoordonneesBancaires() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [messageEstErreur, setMessageEstErreur] = useState(false)
 
   useEffect(() => {
     api
@@ -51,7 +52,10 @@ function CoordonneesBancaires() {
       .then(({ etablissement }) => {
         if (etablissement) setForm({ ...COORD_EMPTY, ...etablissement })
       })
-      .catch((err) => setMessage(err.message))
+      .catch((err) => {
+        setMessage(err.message)
+        setMessageEstErreur(true)
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -62,12 +66,14 @@ function CoordonneesBancaires() {
   async function handleSave() {
     setSaving(true)
     setMessage('')
+    setMessageEstErreur(false)
     try {
       const { etablissement } = await api.saveEtablissement(form)
       setForm({ ...COORD_EMPTY, ...etablissement })
       setMessage('Enregistré ✅')
     } catch (err) {
       setMessage(err.message || 'Erreur lors de la sauvegarde')
+      setMessageEstErreur(true)
     } finally {
       setSaving(false)
     }
@@ -93,7 +99,11 @@ function CoordonneesBancaires() {
       </p>
 
       {message && (
-        <div className="mb-4 text-sm px-3 py-2 rounded-lg bg-teal-light text-teal inline-block">
+        <div
+          className={`mb-4 text-sm px-3 py-2 rounded-lg inline-block ${
+            messageEstErreur ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-teal-light text-teal'
+          }`}
+        >
           {message}
         </div>
       )}

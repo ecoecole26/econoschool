@@ -13,6 +13,7 @@ import {
   changerStatutCaisse,
   notifierRoles
 } from '../lib/caisse.js'
+import { consommerAutorisationApprouvee } from '../lib/autorisations.js'
 
 const router = Router()
 
@@ -72,22 +73,48 @@ router.post('/mouvements', requireAuth, async (req, res) => {
   if (!roleAAccesCaisse(req.user.role, type_caisse)) {
     return res.status(403).json({ error: "Tu n'as pas accès à cette caisse" })
   }
-  if (!roleAAccesOperation(req.user.role, type_operation)) {
-    return res
-      .status(403)
-      .json({ error: 'Les sorties/retraits/dépenses sont réservés au Fondateur' })
+
+  // Une sortie est réservée au Fondateur — SAUF si l'Économe (ou le
+  // Proviseur) dispose d'une autorisation "decaissement"/"depense" que le
+  // Fondateur vient d'approuver depuis la page Autorisations. Dans ce cas
+  // précis, l'autorisation est consommée ici (elle ne resservira pas) et
+  // l'opération est laissée passer.
+  let autorisationUtilisee = null
+  if (type_operation === TYPE_SORTIE && !roleAAccesOperation(req.user.role, type_operation)) {
+    autorisationUtilisee =
+      (await consommerAutorisationApprouvee({
+        code_etablissement: req.user.code_etablissement,
+        econome_login: req.user.nom,
+        type_action: 'decaissement'
+      })) ||
+      (await consommerAutorisationApprouvee({
+        code_etablissement: req.user.code_etablissement,
+        econome_login: req.user.nom,
+        type_action: 'depense'
+      }))
+
+    if (!autorisationUtilisee) {
+      return res.status(403).json({
+        error:
+          'Une sortie de caisse doit être validée par le Fondateur au préalable (page Autorisations).'
+      })
+    }
   }
   const montantNum = Number(montant)
   if (!montantNum || montantNum <= 0) {
     return res.status(400).json({ error: 'Montant invalide' })
   }
 
+  const libelleFinal = autorisationUtilisee
+    ? `${libelle || ''} [autorisation validée par ${autorisationUtilisee.decideur_login}]`.trim()
+    : libelle
+
   try {
     const { mouvement, caisse } = await enregistrerMouvementCaisse({
       type_caisse,
       type_operation,
       montant: montantNum,
-      libelle,
+      libelle: libelleFinal,
       date,
       code_etablissement: req.user.code_etablissement,
       nom: req.user.nom || req.user.role

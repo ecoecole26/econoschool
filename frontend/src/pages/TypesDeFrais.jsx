@@ -10,13 +10,17 @@ export default function TypesDeFrais() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [messageEstErreur, setMessageEstErreur] = useState(false)
   const [busyType, setBusyType] = useState(null) // id du type en cours d'ajout/suppression
 
   function load() {
     return api
       .getTypesFrais(anneeSelectionnee)
       .then(({ types }) => setTypes(types || []))
-      .catch((err) => setMessage(err.message))
+      .catch((err) => {
+        setMessage(err.message)
+        setMessageEstErreur(true)
+      })
   }
 
   useEffect(() => {
@@ -43,11 +47,13 @@ export default function TypesDeFrais() {
   async function handleAdd(typeId) {
     setBusyType(typeId)
     setMessage('')
+    setMessageEstErreur(false)
     try {
       await api.addTranche(typeId)
       await load()
     } catch (err) {
       setMessage(err.message || "Erreur lors de l'ajout")
+      setMessageEstErreur(true)
     } finally {
       setBusyType(null)
     }
@@ -56,11 +62,13 @@ export default function TypesDeFrais() {
   async function handleDelete(typeId, trancheId) {
     setBusyType(typeId)
     setMessage('')
+    setMessageEstErreur(false)
     try {
       await api.deleteTranche(trancheId)
       await load()
     } catch (err) {
       setMessage(err.message || 'Erreur lors de la suppression')
+      setMessageEstErreur(true)
     } finally {
       setBusyType(null)
     }
@@ -69,12 +77,14 @@ export default function TypesDeFrais() {
   async function handleSave() {
     setSaving(true)
     setMessage('')
+    setMessageEstErreur(false)
     try {
       const allTranches = types.flatMap((t) => t.tranches)
       await api.saveTranches(allTranches)
       setMessage('Enregistré ✅')
     } catch (err) {
       setMessage(err.message || 'Erreur lors de la sauvegarde')
+      setMessageEstErreur(true)
     } finally {
       setSaving(false)
     }
@@ -97,7 +107,11 @@ export default function TypesDeFrais() {
       )}
 
       {message && (
-        <div className="mb-5 text-sm px-3 py-2 rounded-lg bg-teal-light text-teal inline-block">
+        <div
+          className={`mb-5 text-sm px-3 py-2 rounded-lg inline-block ${
+            messageEstErreur ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-teal-light text-teal'
+          }`}
+        >
           {message}
         </div>
       )}

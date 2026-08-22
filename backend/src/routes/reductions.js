@@ -3,16 +3,22 @@ import { supabase } from '../config/supabase.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { calculerFrais, getReductionActive } from '../lib/frais.js'
 import { getAnneeCourante } from '../lib/anneeScolaire.js'
+import { consommerAutorisationApprouvee } from '../lib/autorisations.js'
 
 const router = Router()
 
-// Toute la page Réductions est réservée au Fondateur : c'est lui qui reçoit
-// l'élève et accorde le pourcentage. Toujours sur l'ANNÉE EN COURS — une
-// réduction accordée une année ne se reporte jamais automatiquement sur
-// l'année suivante (à réaccorder chaque année si toujours d'actualité).
+// La page Réductions est accessible au Fondateur ET à l'Économe (pour qu'il
+// puisse chercher un élève et voir sa situation) — mais ACCORDER une
+// réduction reste réservé au Fondateur, sauf s'il a explicitement approuvé
+// une demande d'autorisation "reduction_scolarite" pour cet Économe (page
+// Autorisations). Toujours sur l'ANNÉE EN COURS — une réduction accordée
+// une année ne se reporte jamais automatiquement sur l'année suivante (à
+// réaccorder chaque année si toujours d'actualité).
 router.use(requireAuth, (req, res, next) => {
-  if (req.user.role !== 'fondateur') {
-    return res.status(403).json({ error: 'Seul le Fondateur peut accéder aux réductions' })
+  if (!['fondateur', 'econome'].includes(req.user.role)) {
+    return res
+      .status(403)
+      .json({ error: 'Accès réservé au Fondateur et à l\'Économe' })
   }
   next()
 })
@@ -103,6 +109,21 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Pourcentage invalide (0 à 100)' })
   }
 
+  let autorisationUtilisee = null
+  if (req.user.role !== 'fondateur') {
+    autorisationUtilisee = await consommerAutorisationApprouvee({
+      code_etablissement: req.user.code_etablissement,
+      econome_login: req.user.nom,
+      type_action: 'reduction_scolarite'
+    })
+    if (!autorisationUtilisee) {
+      return res.status(403).json({
+        error:
+          'Accorder une réduction doit être validé par le Fondateur au préalable (page Autorisations).'
+      })
+    }
+  }
+
   let annee
   try {
     annee = await getAnneeCourante(req.user.code_etablissement)
@@ -149,13 +170,17 @@ router.post('/', async (req, res) => {
     return res.status(500).json({ error: "Erreur lors de l'enregistrement de la réduction" })
   }
 
+  const motifFinal = autorisationUtilisee
+    ? `${motif || ''} [autorisation validée par ${autorisationUtilisee.decideur_login}]`.trim()
+    : motif || null
+
   const { data: reduction, error: errInsert } = await supabase
     .from('reductions')
     .insert({
       eleve_id,
       matricule: identite.matricule,
       pourcentage: pourcentageNum,
-      motif: motif || null,
+      motif: motifFinal,
       accordee_par: req.user.nom || req.user.role,
       statut: 'active',
       code_etablissement: req.user.code_etablissement,
@@ -187,6 +212,10 @@ router.post('/', async (req, res) => {
 // la réduction (une réduction d'une année passée reste annulable, même si
 // cette page ne les affiche plus au quotidien).
 router.post('/:id/annuler', async (req, res) => {
+  if (req.user.role !== 'fondateur') {
+    return res.status(403).json({ error: 'Seul le Fondateur peut annuler une réduction' })
+  }
+
   const { data: reduction, error: errLecture } = await supabase
     .from('reductions')
     .select('*')
